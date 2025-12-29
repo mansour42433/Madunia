@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام إدارة المديونية والآجل</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+:root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--purple:#8e44ad;--bg:#f0f2f5}
+body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 80px;}
+
+.box{background:#fff;padding:25px;border-radius:12px;max-width:1400px;margin:auto;box-shadow: 0 4px 15px rgba(0,0,0,0.05)}
+h2{margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px;}
+
+/* البطاقات */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin:15px 0}
+.card{padding:20px;border-radius:10px;color:#fff;font-weight:bold;text-align:center;position: relative;}
+.card-val {font-size: 1.6em; margin-top: 10px; display: block;}
+
+/* التحكم */
+.controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:15px;align-items:center; background: #f8f9fa; padding: 10px; border-radius: 8px;}
+input,select,button{padding:10px 15px;border-radius:6px;border:1px solid #ddd; font-family: 'Cairo'; font-weight: 600;}
+button{background:var(--d);color:#fff;border:none;cursor:pointer;transition:0.2s; display: inline-flex; align-items: center; gap: 8px;}
+button:hover{transform: translateY(-2px);}
+
+/* التبويبات */
+.tabs{display:flex;gap:10px;margin-bottom:15px; border-bottom: 2px solid #eee; padding-bottom: 5px; overflow-x: auto;}
+.tab{padding:10px 20px;background:transparent;border:none;border-radius:6px;cursor:pointer; font-weight: 600; color: #7f8c8d; min-width: 120px;}
+.tab.active{background:var(--p);color:#fff;}
+.tab-badge {background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-right: 5px;}
+
+/* الجدول */
+.table-responsive {overflow-x: auto;}
+table{width:100%;border-collapse:separate;border-spacing: 0 8px; min-width:1000px;}
+th{background:var(--d);color:#fff;padding:15px;}
+td{padding:12px;background: #fff; border-top: 1px solid #eee; border-bottom: 1px solid #eee; text-align:center; vertical-align: middle;}
+td:first-child {border-left: 1px solid #eee; border-radius: 8px 0 0 8px;}
+td:last-child {border-right: 1px solid #eee; border-radius: 0 8px 8px 0;}
+
+/* مربعات الاختيار */
+.chk-col {width: 40px;}
+input[type="checkbox"] {width: 18px; height: 18px; cursor: pointer;}
+
+/* شريط الإجراءات العائم */
+.floating-bar {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--d); color: #fff; padding: 15px 30px; border-radius: 50px;
+    display: none; align-items: center; gap: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 1000;
+}
+.floating-bar.show {display: flex;}
+.total-selected {font-size: 1.2em; font-weight: bold; color: var(--o);}
+
+</style>
+</head>
+<body>
+
+<div class="box">
+    <h2><i class="fas fa-layer-group"></i> نظام عزل الآجل وإدارة المديونية</h2>
+
+    <div class="controls">
+        <button onclick="fetchData(true)" id="upBtn"><i class="fas fa-sync-alt"></i> تحديث البيانات</button>
+        <span id="status" style="margin-right: 10px; font-weight: bold; color: var(--p);"></span>
+    </div>
+
+    <div class="stats">
+        <div class="card" style="background:var(--purple)">
+            فواتير آجلة (منتج)<br>
+            <span id="stat-delayed" class="card-val">0</span>
+        </div>
+        <div class="card" style="background:var(--o)">
+            فواتير معلقة (عامة)<br>
+            <span id="stat-pending" class="card-val">0</span>
+        </div>
+        <div class="card" style="background:var(--r)">
+            سجل المديونية (المطالبة)<br>
+            <span id="stat-debt" class="card-val">0</span>
+        </div>
+    </div>
+
+    <div class="controls">
+        <select id="creatorFilter" onchange="renderTable()">
+            <option value="all">كل المناديب</option>
+        </select>
+        <input id="searchInput" placeholder="بحث برقم الفاتورة..." onkeyup="renderTable()">
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" id="tab-delayed" onclick="switchTab('delayed')">
+            <i class="fas fa-star"></i> الآجلة (تلقائي)
+            <span id="badge-delayed" class="tab-badge">0</span>
+        </button>
+        
+        <button class="tab" id="tab-pending" onclick="switchTab('pending')">
+            <i class="fas fa-clock"></i> المعلقة (عامة)
+            <span id="badge-pending" class="tab-badge">0</span>
+        </button>
+        
+        <button class="tab" id="tab-debt" onclick="switchTab('debt')">
+            <i class="fas fa-file-invoice-dollar"></i> سجل المديونية
+            <span id="badge-debt" class="tab-badge">0</span>
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table id="tbl">
+            <thead>
+                <tr>
+                    <th class="chk-col"><input type="checkbox" onchange="toggleAll(this)"></th>
+                    <th>المرجع</th>
+                    <th>العميل</th>
+                    <th>المندوب</th>
+                    <th>المنتج المميز</th>
+                    <th>تاريخ الفاتورة</th>
+                    <th>المبلغ</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<div class="floating-bar" id="floatBar">
+    <div>
+        محدد: <span id="selCount">0</span> | المجموع: <span id="selTotal" class="total-selected">0</span> ريال
+    </div>
+    <div id="actionButtons"></div>
+</div>
+
+<script>
+// --- إعدادات النظام ---
+const API_URL = "/api/get-data"; 
+const TARGET_SKU = "754500950512"; // كود المنتج الآجل
+const TARGET_NAME = "خدمة فاتورة آجلة"; // اسم المنتج الآجل
+
+const STORAGE_INVOICES = "sys_invoices_v3";
+const STORAGE_DEBT_IDS = "sys_debt_ids_v3";
+const STORAGE_NICKS = "sys_nicks";
+
+let invoices = [];
+let debtIds = []; 
+let nicknames = {};
+let selectedIds = new Set(); 
+let currentTab = 'delayed'; // الافتراضي هو الآجلة
+
+// --- التهيئة ---
+function init() {
+    invoices = JSON.parse(localStorage.getItem(STORAGE_INVOICES) || "[]");
+    debtIds = JSON.parse(localStorage.getItem(STORAGE_DEBT_IDS) || "[]");
+    nicknames = JSON.parse(localStorage.getItem(STORAGE_NICKS) || "{}");
+    updateCreatorsList();
+    renderTable();
+}
+
+// --- جلب البيانات ---
+async function fetchData(partial = true) {
+    const btn = document.getElementById("upBtn");
+    const st = document.getElementById("status");
+    btn.disabled = true; st.innerText = "جاري الاتصال...";
+    
+    try {
+        const r = await fetch(API_URL);
+        const d = await r.json();
+        
+        let newInvoices = d.invoices?.invoices || [];
+        
+        // معالجة البيانات وتصنيفها
+        invoices = newInvoices.map(inv => {
+            // التحقق من وجود المنتج الآجل
+            const isDelayedProduct = inv.line_items?.some(item => 
+                item.sku === TARGET_SKU || (item.product_name && item.product_name.includes(TARGET_NAME))
+            ) || false;
+
+            return {
+                id: inv.id,
+                ref: inv.reference,
+                customer: inv.contact_name || inv.customer_name || "عميل عام",
+                creator: inv.created_by,
+                date: inv.issue_date,
+                total: parseFloat(inv.total),
+                status: inv.status,
+                is_delayed: isDelayedProduct // خاصية العزل
+            };
+        });
+
+        localStorage.setItem(STORAGE_INVOICES, JSON.stringify(invoices));
+        updateCreatorsList();
+        renderTable();
+        st.innerText = "✅ تم التحديث والعزل";
+    } catch(e) {
+        st.innerText = "❌ خطأ في الاتصال";
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// --- منطق الفلترة والعرض ---
+function getFilteredData() {
+    const creator = document.getElementById("creatorFilter").value;
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    
+    return invoices.filter(inv => {
+        // 1. منطق التبويبات الصارم
+        let tabMatch = false;
+        const isInDebtList = debtIds.includes(inv.id);
+        const isPaid = inv.status === "Paid";
+        const isDraft = inv.status === "Draft";
+
+        if (isDraft || isPaid) return false; // لا تعرض المسودة أو المدفوعة في القوائم النشطة
+
+        if (currentTab === 'debt') {
+            // تبويب المديونية: يعرض فقط ما تم اختياره يدوياً
+            tabMatch = isInDebtList;
+        } else if (currentTab === 'delayed') {
+            // تبويب الآجلة: يعرض الآجل تلقائياً بشرط ألا يكون قد نُقل للمديونية
+            tabMatch = inv.is_delayed && !isInDebtList;
+        } else if (currentTab === 'pending') {
+            // تبويب المعلقة: يعرض العادي بشرط ألا يكون قد نُقل للمديونية
+            tabMatch = !inv.is_delayed && !isInDebtList;
+        }
+
+        // 2. باقي الفلاتر
+        const creatorMatch = (creator === 'all') || (inv.creator === creator);
+        const searchMatch = inv.ref.toLowerCase().includes(search) || inv.customer.toLowerCase().includes(search);
+
+        return tabMatch && creatorMatch && searchMatch;
+    });
+}
+
+function renderTable() {
+    const data = getFilteredData();
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+    
+    selectedIds.clear();
+    updateFloatingBar();
+    calculateStats(); // تحديث الأرقام والبادجات
+
+    if(data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:40px; color:#999; font-size:1.1em">لا توجد فواتير في هذا القسم</td></tr>`;
+        return;
+    }
+
+    data.forEach(inv => {
+        const nick = nicknames[inv.creator] || inv.creator;
+        // علامة لتمييز المنتج الآجل
+        const productTag = inv.is_delayed 
+            ? '<span style="color:#8e44ad; font-weight:bold"><i class="fas fa-star"></i> منتج آجل</span>' 
+            : '<span style="color:#95a5a6">-</span>';
+
+        tbody.innerHTML += `
+        <tr onclick="rowClick(event, ${inv.id})">
+            <td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td>
+            <td style="font-weight:bold; color:var(--p)">${inv.ref}</td>
+            <td>${inv.customer}</td>
+            <td><span style="background:#eee; padding:2px 8px; border-radius:4px">${nick}</span></td>
+            <td>${productTag}</td>
+            <td>${inv.date}</td>
+            <td style="font-weight:bold">${inv.total.toLocaleString()}</td>
+            <td>${getStatusBadge(inv)}</td>
+        </tr>`;
+    });
+}
+
+function calculateStats() {
+    let stats = { delayed: 0, pending: 0, debt: 0 };
+    let counts = { delayed: 0, pending: 0, debt: 0 };
+
+    invoices.forEach(inv => {
+        if(inv.status === 'Paid' || inv.status === 'Draft') return;
+
+        if(debtIds.includes(inv.id)) {
+            stats.debt += inv.total;
+            counts.debt++;
+        } else if(inv.is_delayed) {
+            stats.delayed += inv.total;
+            counts.delayed++;
+        } else {
+            stats.pending += inv.total;
+            counts.pending++;
+        }
+    });
+
+    // تحديث الكروت
+    document.getElementById("stat-delayed").innerText = stats.delayed.toLocaleString();
+    document.getElementById("stat-pending").innerText = stats.pending.toLocaleString();
+    document.getElementById("stat-debt").innerText = stats.debt.toLocaleString();
+
+    // تحديث عدادات التبويبات
+    document.getElementById("badge-delayed").innerText = counts.delayed;
+    document.getElementById("badge-pending").innerText = counts.pending;
+    document.getElementById("badge-debt").innerText = counts.debt;
+}
+
+function getStatusBadge(inv) {
+    if(debtIds.includes(inv.id)) return '<span style="color:var(--r); font-weight:bold">في المديونية</span>';
+    if(inv.is_delayed) return '<span style="color:#8e44ad; font-weight:bold">آجلة تلقائي</span>';
+    return '<span style="color:var(--o); font-weight:bold">معلقة</span>';
+}
+
+// --- التحديد والإجراءات ---
+function toggleSelect(id) {
+    if(selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    updateFloatingBar();
+}
+
+function toggleAll(source) {
+    const checkboxes = document.querySelectorAll('.row-chk');
+    checkboxes.forEach(chk => {
+        chk.checked = source.checked;
+        const id = parseInt(chk.value);
+        if(source.checked) selectedIds.add(id); else selectedIds.delete(id);
+    });
+    updateFloatingBar();
+}
+
+function rowClick(e, id) {
+    if(e.target.type === 'checkbox') return;
+    const chk = document.querySelector(`.row-chk[value="${id}"]`);
+    if(chk) { chk.checked = !chk.checked; toggleSelect(id); }
+}
+
+function updateFloatingBar() {
+    const bar = document.getElementById("floatBar");
+    const countEl = document.getElementById("selCount");
+    const totalEl = document.getElementById("selTotal");
+    const btnsDiv = document.getElementById("actionButtons");
+
+    if(selectedIds.size > 0) {
+        bar.classList.add("show");
+        
+        let sum = 0;
+        invoices.forEach(inv => { if(selectedIds.has(inv.id)) sum += inv.total; });
+
+        countEl.innerText = selectedIds.size;
+        totalEl.innerText = sum.toLocaleString();
+
+        if(currentTab === 'debt') {
+            btnsDiv.innerHTML = `
+                <button onclick="exportDebtSheet()" style="background:#27ae60"><i class="fas fa-file-excel"></i> تصدير للمطالبة</button>
+                <button onclick="removeFromDebt()" style="background:#c0392b"><i class="fas fa-undo"></i> إزالة</button>
+            `;
+        } else {
+            btnsDiv.innerHTML = `
+                <button onclick="moveToDebt()" class="btn-green"><i class="fas fa-arrow-left"></i> نقل لسجل المديونية</button>
+            `;
+        }
+    } else {
+        bar.classList.remove("show");
+    }
+}
+
+// --- الأزرار ---
+function moveToDebt() {
+    if(!confirm(`نقل ${selectedIds.size} فاتورة إلى سجل المديونية؟`)) return;
+    selectedIds.forEach(id => { if(!debtIds.includes(id)) debtIds.push(id); });
+    localStorage.setItem(STORAGE_DEBT_IDS, JSON.stringify(debtIds));
+    selectedIds.clear();
+    renderTable();
+}
+
+function removeFromDebt() {
+    if(!confirm("إزالة الفواتير المحددة من المديونية وإعادتها لمكانها الأصلي؟")) return;
+    debtIds = debtIds.filter(id => !selectedIds.has(id));
+    localStorage.setItem(STORAGE_DEBT_IDS, JSON.stringify(debtIds));
+    selectedIds.clear();
+    renderTable();
+}
+
+function exportDebtSheet() {
+    let csv = "\uFEFFالمرجع,العميل,المندوب,التاريخ,النوع,المبلغ\n";
+    let totalExport = 0;
+
+    invoices.forEach(inv => {
+        if(selectedIds.has(inv.id)) {
+            const nick = nicknames[inv.creator] || inv.creator;
+            const type = inv.is_delayed ? "آجلة" : "معلقة";
+            csv += `${inv.ref},${inv.customer},${nick},${inv.date},${type},${inv.total}\n`;
+            totalExport += inv.total;
+        }
+    });
+
+    csv += `\n, , , ,الإجمالي المستحق:,${totalExport}`;
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `مطالبة_مديونية_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+}
+
+// --- أدوات ---
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    renderTable();
+}
+
+function updateCreatorsList() {
+    const s = document.getElementById("creatorFilter");
+    const unique = [...new Set(invoices.map(i => i.creator))];
+    const cur = s.value;
+    s.innerHTML = '<option value="all">كل المناديب</option>';
+    unique.forEach(c => { if(c) s.innerHTML += `<option value="${c}">${nicknames[c] || c}</option>`; });
+    s.value = cur;
+}
+
+init();
+</script>
+</body>
+</html>

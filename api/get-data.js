@@ -3,9 +3,8 @@
 export default async function handler(req, res) {
     const API_KEY = process.env.QOYOD_API_KEY;
 
-    // 1. التحقق من وجود المفتاح
     if (!API_KEY) {
-        return res.status(500).json({ error: "API Key missing in environment variables" });
+        return res.status(500).json({ error: "API Key missing" });
     }
 
     const headers = { 
@@ -14,48 +13,41 @@ export default async function handler(req, res) {
     };
 
     try {
-        console.log("📡 جاري طلب فواتير المبيعات (Invoices) لنظام المناديب...");
-
-        // 2. إعداد رابط الاستعلام الصحيح
-        // - نطلب 'invoices' (مبيعات) وليس 'bills' (مشتريات)
-        // - نستبعد المسودات (Draft) والملغاة (Voided)
-        // - نطلب حد 500 فاتورة لنغطي شغل المناديب الأخير
+        // 1. جلب الفواتير (نستبعد المسودات والملغاة)
+        // ملاحظة: status_not_eq=Paid يعني نجلب الغير مدفوعة فقط، إذا كنت تريد المدفوعة أيضاً احذف هذا الفلتر
+        // حسب طلبك "كاش مع المندوب" عادة تكون Approved وليست Paid في النظام بعد
+        const invUrl = "https://www.qoyod.com/api/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&limit=500";
         
-        const url = "https://www.qoyod.com/api/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&limit=500";
-
-        // طلب الفواتير
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-            const errorText = await response.text(); 
-            throw new Error(`Qoyod API Error (${response.status}): ${errorText}`);
-        }
-
-        const data = await response.json();
-        
-        // جلب قائمة الفواتير
-        const invoices = data.invoices || [];
-
-        // 3. (خطوة إضافية مهمة) جلب أسماء العملاء
-        // قيود يعطي في الفاتورة contact_id، نحتاج الاسم لعرضه في الجدول
+        // 2. جلب العملاء لربط الأسماء
         const custUrl = "https://www.qoyod.com/api/2.0/customers?limit=500";
-        const custResponse = await fetch(custUrl, { headers });
-        const custData = await custResponse.json();
 
+        // 3. جلب منتج "خدمة فاتورة آجلة" لمعرفة الـ ID الخاص به بدقة
+        const prodUrl = "https://www.qoyod.com/api/2.0/products?q[sku_eq]=754500950512";
 
-        console.log(`✅ تم استلام ${invoices.length} فاتورة مبيعات.`);
+        // تنفيذ الطلبات بالتوازي
+        const [invRes, custRes, prodRes] = await Promise.all([
+            fetch(invUrl, { headers }),
+            fetch(custUrl, { headers }),
+            fetch(prodUrl, { headers })
+        ]);
 
-        // 4. إرجاع البيانات بالتنسيق الذي ينتظره ملف HTML
+        if (!invRes.ok) throw new Error("فشل الاتصال بقيود");
+
+        const invData = await invRes.json();
+        const custData = await custRes.json();
+        const prodData = await prodRes.json();
+
+        // تحديد منتج الأجل
+        const targetProduct = prodData.products && prodData.products.length > 0 ? prodData.products[0] : null;
+
         return res.status(200).json({ 
-            invoices: { invoices: invoices },
-            customers: { customers: custData.customers || [] }
+            invoices: { invoices: invData.invoices || [] },
+            customers: { customers: custData.customers || [] },
+            target_product: targetProduct 
         });
 
     } catch (error) {
-        console.error("❌ Error fetching data:", error);
-        return res.status(500).json({ 
-            error: "فشل الاتصال بنظام قيود",
-            details: error.message
-        });
+        console.error("Error:", error);
+        return res.status(500).json({ error: error.message });
     }
 }

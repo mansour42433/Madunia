@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام التقرير الشامل المطور</title>
+<title>نظام التقرير الشامل المطور (Excel ملون)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <style>
 :root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9}
@@ -81,7 +82,7 @@ tr:last-child td {border-bottom: none;}
     </div>
 
     <div style="display: flex; gap: 10px;">
-        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير (Excel) الحالي</button>
+        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير (Excel) ملون</button>
         <button onclick="saveToHistory()" class="save-archive"><i class="fas fa-save"></i> حفظ المديونية للأرشيف</button>
     </div>
 
@@ -148,8 +149,6 @@ const API_URL = "/api/get-data";
 const TARGET_SKU_FALLBACK = "754500950512";
 const STORAGE = {INVOICES:"sys_inv_v6",DEBT_IDS:"sys_debt_v6",EXPENSES:"sys_exp_v6",NICKS:"sys_nicks_v6", HISTORY:"sys_hist_v1"};
 let invoices=[], debtIds=[], expenses=[], nicknames={}, historyLog=[], selectedIds=new Set(), currentTab='delayed';
-
-// متغيرات عالمية
 let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0 };
 
 function init(){
@@ -343,7 +342,6 @@ function renderCurrentTab(){
     });
 }
 
-// --- المصروفات ---
 function renderExpenses(){
     const creator=document.getElementById("creatorFilter").value;
     const tbody=document.getElementById("expenseRows");
@@ -389,7 +387,6 @@ function delExpense(id){
     calculateStats(); renderExpenses();
 }
 
-// --- التحكم بالتبويبات ---
 function switchTab(tab){
     currentTab=tab;
     document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
@@ -397,7 +394,6 @@ function switchTab(tab){
     renderCurrentTab();
 }
 
-// --- الشريط العائم ---
 function toggleSelect(id){
     if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
     updateFloatingBar();
@@ -428,7 +424,6 @@ function updateFloatingBar(){
         } else if(currentTab==='debt'){
              buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
         } else if(currentTab==='cash'){
-             // تمت إعادة زر التحويل لآجل هنا
              buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button>`;
              buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
         }
@@ -438,7 +433,6 @@ function updateFloatingBar(){
     }
 }
 
-// --- منطق البيانات ---
 function moveToDebt(){
     selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); });
     localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
@@ -455,7 +449,6 @@ function markAsDelayed(){
     renderCurrentTab();
 }
 
-// --- الأسماء ---
 function renderNicks(){ updateCreatorsList(); }
 function updateCreatorsList(){
     const s=document.getElementById("creatorFilter");
@@ -490,7 +483,7 @@ function saveNick(creator, val){
 }
 
 // ============================================
-// نظام الأرشيف (History)
+// نظام الأرشيف
 // ============================================
 function saveToHistory(){
     const creator = document.getElementById("creatorFilter").value;
@@ -499,7 +492,6 @@ function saveToHistory(){
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toLocaleString('ar-EG');
     
-    // جمع البيانات الحالية "كقيم" وليس كروابط (Snapshot)
     const activeDebtInvoices = invoices.filter(inv => {
         const isDebt = debtIds.includes(inv.id);
         const isCreator = (creator === 'all' || inv.creator === creator);
@@ -508,7 +500,6 @@ function saveToHistory(){
 
     const activeExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     
-    // فواتير الآجل (للعرض فقط)
     const activeDelayed = invoices.filter(inv => {
         return inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
     });
@@ -528,7 +519,7 @@ function saveToHistory(){
         net: currentStats.net,
         invoices: activeDebtInvoices,
         expenses: activeExpenses,
-        delayedInvoices: activeDelayed // حفظنا الآجل أيضاً في الأرشيف
+        delayedInvoices: activeDelayed
     };
 
     historyLog.push(reportSnapshot);
@@ -540,8 +531,6 @@ function renderHistory(){
     const list = document.getElementById("historyList");
     list.innerHTML = "";
     const creator = document.getElementById("creatorFilter").value;
-    
-    // عرض أرشيف المندوب المختار فقط، أو الكل
     const filteredHistory = historyLog.filter(h => creator === 'all' || h.creatorRaw === creator).reverse();
 
     if(filteredHistory.length === 0){
@@ -573,22 +562,21 @@ function deleteHistoryItem(id){
 }
 
 function exportHistoryItem(item){
-    generateExcel(item.creatorName, item.invoices, item.expenses, item.delayedInvoices, 
+    generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.delayedInvoices, 
                  {debt: item.totalDebt, expenses: item.totalExp, net: item.net}, item.saveDate);
 }
 
 // ============================================
-// نظام التصدير المطور
+// نظام التصدير الملون الجديد (ExcelJS)
 // ============================================
 
 function exportToExcel(isHistory = false) {
-    if(isHistory) return; // تم التعامل معه دالة exportHistoryItem
+    if(isHistory) return; 
 
     const creator = document.getElementById("creatorFilter").value;
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toISOString().split('T')[0];
 
-    // تجميع البيانات الحالية
     const debtInvoices = invoices.filter(inv => {
         const isDebt = debtIds.includes(inv.id);
         const isCreator = (creator === 'all' || inv.creator === creator);
@@ -601,65 +589,102 @@ function exportToExcel(isHistory = false) {
         return inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
     });
     
-    // استدعاء دالة التوليد الموحدة
-    generateExcel(creatorName, debtInvoices, filteredExpenses, delayedInvoices, currentStats, dateStr);
+    generateColoredExcel(creatorName, debtInvoices, filteredExpenses, delayedInvoices, currentStats, dateStr);
 }
 
-// دالة توليد ملف الاكسل (تستخدم للتقرير الحالي وللأرشيف)
-function generateExcel(name, debtInvs, exps, delayedInvs, stats, dateVal){
-    const wb = XLSX.utils.book_new();
-    let ws_data = [];
+async function generateColoredExcel(name, debtInvs, exps, delayedInvs, stats, dateVal){
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('التقرير المالي', {views: [{rightToLeft: true}]});
 
-    // 1. الرأس
-    ws_data.push(["التقرير المالي الشامل"]);
-    ws_data.push(["المندوب:", name]);
-    ws_data.push(["تاريخ التقرير:", dateVal]);
-    ws_data.push([]); 
+    // تنسيق موحد للأعمدة
+    sheet.columns = [
+        { header: 'البيان', key: 'col1', width: 30 },
+        { header: 'التفاصيل', key: 'col2', width: 25 },
+        { header: 'التاريخ', key: 'col3', width: 15 },
+        { header: 'المبلغ', key: 'col4', width: 15 }
+    ];
 
-    // 2. ملخص الحسابات
-    ws_data.push(["--- ملخص الحسابات ---"]);
-    ws_data.push(["البيان", "القيمة"]);
-    ws_data.push(["إجمالي المديونية المختارة", stats.debt]);
-    ws_data.push(["إجمالي المصروفات", stats.expenses]);
-    ws_data.push(["الصافي المستحق (مديونية - مصروفات)", stats.net]);
-    ws_data.push([]);
+    // --- العنوان ---
+    sheet.addRow(['التقرير المالي الشامل']);
+    sheet.mergeCells('A1:D1');
+    const titleRow = sheet.getRow(1);
+    titleRow.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleRow.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF2C3E50'} };
+    titleRow.alignment = { horizontal: 'center' };
 
-    // 3. تفاصيل المديونية
-    ws_data.push(["--- تفاصيل فواتير المديونية (تدخل في الحساب) ---"]);
-    ws_data.push(["المرجع", "العميل", "التاريخ", "المبلغ المستحق"]);
+    sheet.addRow(['المندوب:', name, 'التاريخ:', dateVal]);
+    sheet.getRow(2).font = { bold: true };
+    sheet.addRow([]);
+
+    // --- الملخص ---
+    const summaryHeader = sheet.addRow(['ملخص الحسابات']);
+    summaryHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summaryHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF2980B9'} }; // أزرق
+    
+    sheet.addRow(['إجمالي المديونية المختارة', '', '', stats.debt]);
+    sheet.addRow(['إجمالي المصروفات', '', '', stats.expenses]);
+    const netRow = sheet.addRow(['الصافي المستحق (مديونية - مصروفات)', '', '', stats.net]);
+    netRow.font = { bold: true, size: 12 };
+    netRow.getCell(4).font = { bold: true, color: { argb: 'FF0000FF' } }; // أزرق للرقم
+    sheet.addRow([]);
+
+    // --- المديونية ---
+    const debtHeader = sheet.addRow(['تفاصيل فواتير المديونية (تدخل في الحساب)']);
+    sheet.mergeCells(`A${debtHeader.number}:D${debtHeader.number}`);
+    debtHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    debtHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFE74C3C'} }; // أحمر
+    debtHeader.alignment = { horizontal: 'center' };
+
+    const debtCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ المستحق']);
+    debtCols.font = { bold: true };
+    debtCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
+
     debtInvs.forEach(inv => {
-        ws_data.push([inv.ref, inv.customer, inv.date, inv.due]);
+        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
     });
-    // سطر المجموع للمديونية
-    ws_data.push(["المجموع", "", "", stats.debt]);
-    ws_data.push([]);
+    const debtTotalRow = sheet.addRow(['المجموع', '', '', stats.debt]);
+    debtTotalRow.font = { bold: true };
+    sheet.addRow([]);
 
-    // 4. تفاصيل المصروفات
-    ws_data.push(["--- تفاصيل المصروفات ---"]);
-    ws_data.push(["الوصف", "التاريخ", "المبلغ"]);
+    // --- المصروفات ---
+    const expHeader = sheet.addRow(['تفاصيل المصروفات']);
+    sheet.mergeCells(`A${expHeader.number}:D${expHeader.number}`);
+    expHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    expHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFC0392B'} }; // أحمر غامق
+    expHeader.alignment = { horizontal: 'center' };
+
+    const expCols = sheet.addRow(['الوصف', 'المندوب', 'التاريخ', 'المبلغ']);
+    expCols.font = { bold: true };
+    expCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
+
     exps.forEach(exp => {
-        ws_data.push([exp.desc, exp.date, exp.amount]);
+        sheet.addRow([exp.desc, name, exp.date, exp.amount]);
     });
-    ws_data.push(["المجموع", "", stats.expenses]);
-    ws_data.push([]);
+    const expTotalRow = sheet.addRow(['المجموع', '', '', stats.expenses]);
+    expTotalRow.font = { bold: true };
+    sheet.addRow([]);
 
-    // 5. تفاصيل الآجل (للعلم فقط)
+    // --- الآجل ---
     const totalDelayed = delayedInvs.reduce((a,b)=>a+b.due,0);
-    ws_data.push(["--- الفواتير الآجلة المتبقية (للعلم فقط - لا تدخل في الصافي) ---"]);
-    ws_data.push(["المرجع", "العميل", "التاريخ", "المبلغ"]);
+    const delayHeader = sheet.addRow(['الفواتير الآجلة المتبقية (للعلم فقط - لا تدخل في الصافي)']);
+    sheet.mergeCells(`A${delayHeader.number}:D${delayHeader.number}`);
+    delayHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    delayHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF27AE60'} }; // أخضر
+    delayHeader.alignment = { horizontal: 'center' };
+
+    const delayCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']);
+    delayCols.font = { bold: true };
+
     delayedInvs.forEach(inv => {
-        ws_data.push([inv.ref, inv.customer, inv.date, inv.due]);
+        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
     });
-    ws_data.push(["إجمالي الآجل", "", "", totalDelayed]);
+    const delayTotalRow = sheet.addRow(['إجمالي الآجل', '', '', totalDelayed]);
+    delayTotalRow.font = { bold: true };
 
-    // إنشاء الشيت
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-
-    // تنسيق عرض الأعمدة
-    ws['!cols'] = [{wch: 30}, {wch: 25}, {wch: 15}, {wch: 15}];
-
-    XLSX.utils.book_append_sheet(wb, ws, "التقرير");
-    XLSX.writeFile(wb, `تقرير_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);
+    // --- الحفظ والتنزيل ---
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `تقرير_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);
 }
 
 init();

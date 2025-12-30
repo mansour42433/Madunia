@@ -7,47 +7,53 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: "API Key missing" });
     }
 
-    const headers = { 
-        "API-KEY": API_KEY, 
-        "Content-Type": "application/json" 
+    const headers = {
+        "API-KEY": API_KEY,
+        "Content-Type": "application/json"
     };
 
     try {
-        // 1. جلب الفواتير (نستبعد المسودات والملغاة)
-        // ملاحظة: status_not_eq=Paid يعني نجلب الغير مدفوعة فقط، إذا كنت تريد المدفوعة أيضاً احذف هذا الفلتر
-        // حسب طلبك "كاش مع المندوب" عادة تكون Approved وليست Paid في النظام بعد
-        const invUrl = "https://www.qoyod.com/api/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&limit=500";
-        
-        // 2. جلب العملاء لربط الأسماء
+        // 1️⃣ جلب الفواتير غير المدفوعة فقط (الحل الصحيح)
+        const invUrl =
+            "https://www.qoyod.com/api/2.0/invoices" +
+            "?q[status_not_eq]=Draft" +
+            "&q[status_not_eq]=Voided" +
+            "&q[status_not_eq]=Paid" +
+            "&limit=500";
+
+        // 2️⃣ جلب العملاء
         const custUrl = "https://www.qoyod.com/api/2.0/customers?limit=500";
 
-        // 3. جلب منتج "خدمة فاتورة آجلة" لمعرفة الـ ID الخاص به بدقة
+        // 3️⃣ جلب منتج الآجل
         const prodUrl = "https://www.qoyod.com/api/2.0/products?q[sku_eq]=754500950512";
 
-        // تنفيذ الطلبات بالتوازي
         const [invRes, custRes, prodRes] = await Promise.all([
             fetch(invUrl, { headers }),
             fetch(custUrl, { headers }),
             fetch(prodUrl, { headers })
         ]);
 
-        if (!invRes.ok) throw new Error("فشل الاتصال بقيود");
+        if (!invRes.ok) {
+            throw new Error("فشل جلب الفواتير من قيود");
+        }
 
         const invData = await invRes.json();
         const custData = await custRes.json();
         const prodData = await prodRes.json();
 
-        // تحديد منتج الأجل
-        const targetProduct = prodData.products && prodData.products.length > 0 ? prodData.products[0] : null;
+        const targetProduct =
+            prodData.products && prodData.products.length
+                ? prodData.products[0]
+                : null;
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             invoices: { invoices: invData.invoices || [] },
             customers: { customers: custData.customers || [] },
-            target_product: targetProduct 
+            target_product: targetProduct
         });
 
-    } catch (error) {
-        console.error("Error:", error);
-        return res.status(500).json({ error: error.message });
+    } catch (err) {
+        console.error("QOYOD ERROR:", err);
+        return res.status(500).json({ error: err.message });
     }
 }

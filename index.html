@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <style>
 :root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9}
 body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 100px;}
@@ -46,8 +48,6 @@ tr:last-child td {border-bottom: none;}
 .expense-form {display: flex; gap: 10px; background: #fff5f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
 .expense-form div {flex: 1;}
 .expense-form label {display: block; font-size: 0.8em; margin-bottom: 5px; color: #c0392b;}
-/* Export Hidden Table */
-#exportTable {display:none;}
 </style>
 </head>
 <body>
@@ -135,7 +135,7 @@ function init(){
     expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
     nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
     updateCreatorsList();
-    calculateStats(); // الحساب المبدئي
+    calculateStats(); 
     renderCurrentTab();
 }
 
@@ -172,7 +172,7 @@ async function fetchData(){
         });
         localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
         updateCreatorsList(); 
-        calculateStats(); // إعادة الحساب بعد الجلب
+        calculateStats(); 
         renderCurrentTab();
         btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; 
         st.innerText="✅ تم"; 
@@ -187,9 +187,8 @@ async function fetchData(){
     }
 }
 
-// دالة جديدة للتعامل مع تغيير المندوب
 function handleFilterChange() {
-    calculateStats(); // إعادة الحساب فوراً عند تغيير المندوب
+    calculateStats(); 
     renderCurrentTab();
 }
 
@@ -198,19 +197,16 @@ function getFilteredInvoices(){
     const search=document.getElementById("searchInput").value.toLowerCase();
     
     return invoices.filter(inv=>{
-        // شروط الاستبعاد العامة
         if(inv.status==="Draft"||inv.status==="Voided"||inv.status==="Paid"||inv.due<=0) return false;
         
-        // التحقق من المندوب (أساسي في كل مكان الآن)
         const creatorMatch=(creator==='all'||inv.creator===creator);
         if(!creatorMatch) return false;
 
-        // منطق التبويبات
         const inDebt=debtIds.includes(inv.id); 
         let tabMatch=false;
-        if(currentTab==='debt') tabMatch=inDebt; // فقط ما تم إضافته للمديونية
-        else if(currentTab==='delayed') tabMatch=inv.is_delayed&&!inDebt; // آجل ولم يضاف للمديونية
-        else if(currentTab==='cash') tabMatch=!inv.is_delayed&&!inDebt; // كاش ولم يضاف للمديونية
+        if(currentTab==='debt') tabMatch=inDebt;
+        else if(currentTab==='delayed') tabMatch=inv.is_delayed&&!inDebt;
+        else if(currentTab==='cash') tabMatch=!inv.is_delayed&&!inDebt;
         
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
         
@@ -221,11 +217,9 @@ function getFilteredInvoices(){
 function calculateStats(){
     const creator = document.getElementById("creatorFilter").value;
 
-    // 1. حساب المصروفات للمندوب المختار فقط
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     const totalExp = filteredExpenses.reduce((a, b) => a + b.amount, 0);
 
-    // 2. حساب المديونية للمندوب المختار فقط (الفواتير النشطة الموجودة في قائمة المديونية)
     const debtInvoices = invoices.filter(inv => {
         const isDebt = debtIds.includes(inv.id);
         const isCreator = (creator === 'all' || inv.creator === creator);
@@ -234,32 +228,26 @@ function calculateStats(){
     });
     const totalDebt = debtInvoices.reduce((a, b) => a + b.due, 0);
 
-    // 3. حساب الآجل (للمعلومة فقط - لا يدخل في الصافي)
     const delayedInvoices = invoices.filter(inv => {
         const isDelayed = inv.is_delayed;
-        const isDebt = debtIds.includes(inv.id); // شرط: غير موجود في المديونية
+        const isDebt = debtIds.includes(inv.id);
         const isCreator = (creator === 'all' || inv.creator === creator);
         const isActive = (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
         return isDelayed && !isDebt && isCreator && isActive;
     });
     const totalDelayed = delayedInvoices.reduce((a, b) => a + b.due, 0);
 
-    // 4. حساب الصافي (المديونية - المصروفات)
     const net = totalDebt - totalExp;
 
-    // تحديث الواجهة
     document.getElementById("stat-delayed").innerText = totalDelayed.toLocaleString();
     document.getElementById("stat-debt").innerText = totalDebt.toLocaleString();
     document.getElementById("stat-expense").innerText = totalExp.toLocaleString();
     document.getElementById("stat-net").innerText = net.toLocaleString();
 
-    // تحديث العدادات (Badges) في التبويبات
-    // نحتاج حساب الأعداد بناء على المندوب المختار أيضاً
     document.getElementById("badge-delayed").innerText = delayedInvoices.length;
     document.getElementById("badge-debt").innerText = debtInvoices.length;
     document.getElementById("badge-expenses").innerText = filteredExpenses.length;
     
-    // حساب الكاش
     const cashInvoices = invoices.filter(inv => {
         const isDelayed = inv.is_delayed;
         const isDebt = debtIds.includes(inv.id);
@@ -269,7 +257,6 @@ function calculateStats(){
     });
     document.getElementById("badge-cash").innerText = cashInvoices.length;
 
-    // حفظ القيم للاستخدام عند التصدير
     currentStats = { debt: totalDebt, expenses: totalExp, net: net, delayed: totalDelayed };
 }
 
@@ -281,7 +268,6 @@ function renderCurrentTab(){
     selectedIds.clear(); 
     updateFloatingBar(); 
     
-    // تحديث حالة الأزرار
     document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
     document.getElementById("tab-"+currentTab)?.classList.add("active");
 
@@ -328,7 +314,6 @@ function renderExpenses(){
     const creator=document.getElementById("creatorFilter").value;
     const tbody=document.getElementById("expenseRows");
     tbody.innerHTML="";
-    // الفلترة هنا مهمة للعرض
     const filtered = expenses.filter(e=>creator==='all'||e.creator===creator);
     
     if(filtered.length === 0) {
@@ -367,7 +352,7 @@ function addExpense(){
     localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
     document.getElementById("expDesc").value="";
     document.getElementById("expAmount").value="";
-    calculateStats(); // تحديث الحسابات فوراً
+    calculateStats(); 
     renderExpenses();
 }
 
@@ -375,11 +360,10 @@ function delExpense(id){
     if(!confirm("حذف المصروف؟"))return;
     expenses=expenses.filter(e=>e.id!==id);
     localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
-    calculateStats(); // تحديث الحسابات فوراً
+    calculateStats();
     renderExpenses();
 }
 
-// --- دوال إدارة الأسماء المستعارة ---
 function renderNicks(){ updateCreatorsList(); }
 
 function updateCreatorsList(){
@@ -417,7 +401,6 @@ function saveNick(creator, val){
     updateCreatorsList();
 }
 
-// --- دوال التحكم والتبديل ---
 function switchTab(tab){
     currentTab=tab;
     renderCurrentTab();
@@ -471,36 +454,26 @@ function updateFloatingBar(){
 function moveToDebt(){
     selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); });
     localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
-    calculateStats(); // تحديث الحسابات
+    calculateStats(); 
     renderCurrentTab();
 }
 
 function removeFromDebt(){
     debtIds=debtIds.filter(id=>!selectedIds.has(id));
     localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
-    calculateStats(); // تحديث الحسابات
+    calculateStats(); 
     renderCurrentTab();
 }
 
-function markAsCash(){
-    invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=false; });
-    localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
-    renderCurrentTab();
-}
-
-function markAsDelayed(){
-    invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; });
-    localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
-    renderCurrentTab();
-}
-
-// --- وظيفة التصدير الجديدة ---
+// ============================================
+// دالة التصدير الجديدة باستخدام SheetJS (Excel حقيقي)
+// ============================================
 function exportToExcel() {
     const creator = document.getElementById("creatorFilter").value;
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toISOString().split('T')[0];
-    
-    // تجميع بيانات المديونية الحالية
+
+    // تجميع البيانات
     const debtInvoices = invoices.filter(inv => {
         const isDebt = debtIds.includes(inv.id);
         const isCreator = (creator === 'all' || inv.creator === creator);
@@ -508,71 +481,61 @@ function exportToExcel() {
         return isDebt && isCreator && isActive;
     });
 
-    // تجميع بيانات المصروفات الحالية
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
 
-    let html = `
-    <html dir="rtl">
-    <head><meta charset="UTF-8"></head>
-    <body>
-        <h2 style="text-align:center">تقرير المديونية والمصروفات</h2>
-        <p><strong>المندوب:</strong> ${creatorName}</p>
-        <p><strong>التاريخ:</strong> ${dateStr}</p>
-        <br>
-        
-        <table border="1" style="width:100%; border-collapse:collapse; text-align:center; background:#f0f0f0;">
-            <tr><th colspan="2" style="background:#2c3e50; color:white">ملخص الحساب</th></tr>
-            <tr><td>إجمالي المديونية</td><td>${currentStats.debt.toLocaleString()}</td></tr>
-            <tr><td>إجمالي المصروفات</td><td>${currentStats.expenses.toLocaleString()}</td></tr>
-            <tr><td style="font-weight:bold">الصافي المستحق</td><td style="font-weight:bold; color:blue">${currentStats.net.toLocaleString()}</td></tr>
-        </table>
-        <br>
+    // إنشاء كائن Workbook
+    const wb = XLSX.utils.book_new();
+    
+    // إعداد البيانات كمصفوفة من المصفوفات (كل مصفوفة فرعية تمثل صفاً)
+    let ws_data = [];
+    
+    // العنوان
+    ws_data.push(["تقرير المديونية والمصروفات"]);
+    ws_data.push(["المندوب:", creatorName]);
+    ws_data.push(["التاريخ:", dateStr]);
+    ws_data.push([]); // سطر فارغ
 
-        <h3 style="background:#eee; padding:5px">تفاصيل فواتير المديونية</h3>
-        <table border="1" style="width:100%; border-collapse:collapse; text-align:center">
-            <tr style="background:#e74c3c; color:white">
-                <th>المرجع</th><th>العميل</th><th>التاريخ</th><th>المبلغ المستحق</th>
-            </tr>
-    `;
+    // قسم الملخص
+    ws_data.push(["ملخص الحساب"]);
+    ws_data.push(["إجمالي المديونية", currentStats.debt]);
+    ws_data.push(["إجمالي المصروفات", currentStats.expenses]);
+    ws_data.push(["الصافي المستحق", currentStats.net]);
+    ws_data.push([]);
 
+    // قسم الفواتير
+    ws_data.push(["تفاصيل فواتير المديونية"]);
+    ws_data.push(["المرجع", "العميل", "التاريخ", "المبلغ المستحق"]);
     debtInvoices.forEach(inv => {
-        html += `<tr>
-            <td>${inv.ref}</td>
-            <td>${inv.customer}</td>
-            <td>${inv.date}</td>
-            <td>${inv.due}</td>
-        </tr>`;
+        ws_data.push([inv.ref, inv.customer, inv.date, inv.due]);
     });
+    ws_data.push([]);
 
-    html += `</table><br>
-        <h3 style="background:#eee; padding:5px">تفاصيل المصروفات</h3>
-        <table border="1" style="width:100%; border-collapse:collapse; text-align:center">
-            <tr style="background:#c0392b; color:white">
-                <th>الوصف</th><th>التاريخ</th><th>المبلغ</th>
-            </tr>`;
-
+    // قسم المصروفات
+    ws_data.push(["تفاصيل المصروفات"]);
+    ws_data.push(["الوصف", "التاريخ", "المبلغ"]);
     filteredExpenses.forEach(exp => {
-        html += `<tr>
-            <td>${exp.desc}</td>
-            <td>${exp.date}</td>
-            <td>${exp.amount}</td>
-        </tr>`;
+        ws_data.push([exp.desc, exp.date, exp.amount]);
     });
 
-    html += `</table></body></html>`;
+    // تحويل البيانات إلى ورقة عمل (Worksheet)
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
 
-    // إنشاء رابط تحميل
-    const blob = new Blob([html], {type: "application/vnd.ms-excel"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `تقرير_${creatorName}_${dateStr}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // ضبط عرض الأعمدة (تجميلي)
+    const wscols = [
+        {wch: 25}, // عرض العمود الأول
+        {wch: 20}, // عرض العمود الثاني
+        {wch: 15}, // عرض العمود الثالث
+        {wch: 15}  // عرض العمود الرابع
+    ];
+    ws['!cols'] = wscols;
+
+    // إضافة الورقة للملف
+    XLSX.utils.book_append_sheet(wb, ws, "التقرير");
+
+    // تنزيل الملف
+    XLSX.writeFile(wb, `تقرير_${creatorName}_${dateStr}.xlsx`);
 }
 
-// بدء التشغيل
 init();
 </script>
 </body>

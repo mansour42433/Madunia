@@ -13,17 +13,16 @@
 <style>
 :root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9}
 body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 100px;}
+
 .box{background:#fff;padding:25px;border-radius:15px;max-width:1400px;margin:auto;box-shadow: 0 4px 20px rgba(0,0,0,0.05)}
 h2{margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center}
 
-/* كروت الإحصائيات */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:25px}
 .card{padding:20px;border-radius:12px;color:#fff;text-align:center;position: relative; overflow: hidden;}
 .card h3 {margin: 0 0 10px; font-size: 1rem; opacity: 0.9;}
 .card-val {font-size: 1.8em; font-weight: bold;}
 .card i {position: absolute; top: 10px; left: 10px; opacity: 0.2; font-size: 3em;}
 
-/* التحكم */
 .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;align-items:center; background: #f8f9fa; padding: 15px; border-radius: 10px;}
 input,select,button{padding:10px 15px;border-radius:8px;border:1px solid #ddd; font-family: 'Cairo'; font-weight: 600; outline: none;}
 button{background:var(--d);color:#fff;border:none;cursor:pointer;transition:0.2s; display: inline-flex; align-items: center; gap: 8px;}
@@ -31,28 +30,24 @@ button:hover{transform: translateY(-2px);}
 button.refresh {background: var(--p);}
 button.export-all {background: #27ae60; width: 100%; justify-content: center; font-size: 1.1em; margin-top: 10px;}
 
-/* التبويبات */
 .tabs{display:flex;gap:10px;margin-bottom:0; border-bottom: 1px solid #ddd; overflow-x: auto;}
 .tab{padding:12px 25px;background:transparent;border:none;border-bottom: 3px solid transparent; cursor:pointer; font-weight: 700; color: #7f8c8d; min-width: 120px; transition: 0.3s;}
 .tab:hover {color: var(--p);}
 .tab.active{color:var(--p);border-bottom-color:var(--p); background: rgba(41, 128, 185, 0.05);}
 .tab-badge {background: #eee; color: #555; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-right: 5px;}
 
-/* الجدول */
 .table-responsive {overflow-x: auto; background: #fff; border-radius: 0 0 15px 15px; border: 1px solid #ddd; border-top: none; min-height: 300px;}
 table{width:100%;border-collapse:collapse; min-width:1000px;}
 th{background:#f8f9fa;color:var(--d);padding:15px; text-align: right; font-weight: 700;}
 td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
 tr:last-child td {border-bottom: none;}
 
-/* الوسوم */
 .tag {padding: 4px 10px; border-radius: 20px; font-size: 0.85em; font-weight: bold;}
 .tag-delayed {background: #e8f6fd; color: var(--p);}
 .tag-cash {background: #eafaf1; color: var(--g);}
 .tag-debt {background: #fdeaea; color: var(--r);}
-.tag-part {background: #fff3cd; color: #856404;} 
+.tag-part {background: #fff3cd; color: #856404;}
 
-/* شريط الإجراءات */
 .floating-bar {
     position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
     background: var(--d); color: #fff; padding: 15px 30px; border-radius: 50px;
@@ -61,7 +56,6 @@ tr:last-child td {border-bottom: none;}
 }
 .floating-bar.show {transform: translateX(-50%) translateY(0); opacity: 1;}
 
-/* نموذج المصروفات */
 .expense-form {display: flex; gap: 10px; background: #fff5f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
 .expense-form div {flex: 1;}
 .expense-form label {display: block; font-size: 0.8em; margin-bottom: 5px; color: #c0392b;}
@@ -94,7 +88,7 @@ tr:last-child td {border-bottom: none;}
         </div>
         <div class="card" style="background:var(--r)">
             <i class="fas fa-wallet"></i>
-            <h3>إجمالي المديونية (النقدية)</h3>
+            <h3>إجمالي المديونية</h3>
             <span id="stat-debt" class="card-val">0</span>
         </div>
         <div class="card" style="background:#c0392b">
@@ -104,7 +98,7 @@ tr:last-child td {border-bottom: none;}
         </div>
         <div class="card" style="background:var(--d)">
             <i class="fas fa-calculator"></i>
-            <h3>الصافي المستحق (كاش)</h3>
+            <h3>الصافي المستحق (كاش – مصروفات)</h3>
             <span id="stat-net" class="card-val">0</span>
         </div>
     </div>
@@ -114,21 +108,25 @@ tr:last-child td {border-bottom: none;}
 
     <div class="tabs">
         <button class="tab active" id="tab-delayed" onclick="switchTab('delayed')">
-            <i class="fas fa-star"></i> الآجلة (تلقائي)
+            <i class="fas fa-star"></i> الآجلة
             <span id="badge-delayed" class="tab-badge">0</span>
         </button>
+        
         <button class="tab" id="tab-cash" onclick="switchTab('cash')">
             <i class="fas fa-wallet"></i> نقدية / كاش
             <span id="badge-cash" class="tab-badge">0</span>
         </button>
+        
         <button class="tab" id="tab-debt" onclick="switchTab('debt')">
-            <i class="fas fa-file-invoice-dollar"></i> المديونية المختارة
+            <i class="fas fa-file-invoice-dollar"></i> المديونية
             <span id="badge-debt" class="tab-badge">0</span>
         </button>
+        
         <button class="tab" id="tab-expenses" onclick="switchTab('expenses')">
             <i class="fas fa-gas-pump"></i> المصروفات
             <span id="badge-expenses" class="tab-badge">0</span>
         </button>
+
         <button class="tab" id="tab-nicks" onclick="switchTab('nicks')">
             <i class="fas fa-user-tag"></i> أسماء المناديب
         </button>
@@ -194,6 +192,7 @@ tr:last-child td {border-bottom: none;}
 </div>
 
 <script>
+// --- إعدادات النظام ---
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
 
@@ -205,17 +204,18 @@ const STORAGE = {
 };
 
 let invoices = [];
-let debtIds = []; 
+let debtIds = [];
 let expenses = [];
 let nicknames = {};
-let selectedIds = new Set(); 
-let currentTab = 'delayed'; 
+let selectedIds = new Set();
+let currentTab = 'delayed';
 
 function init() {
     invoices = JSON.parse(localStorage.getItem(STORAGE.INVOICES) || "[]");
     debtIds = JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS) || "[]");
     expenses = JSON.parse(localStorage.getItem(STORAGE.EXPENSES) || "[]");
     nicknames = JSON.parse(localStorage.getItem(STORAGE.NICKS) || "{}");
+    
     updateCreatorsList();
     renderCurrentTab();
 }
@@ -229,6 +229,7 @@ async function fetchData() {
         const r = await fetch(API_URL);
         const d = await r.json();
         const targetId = d.target_product?.id;
+        
         const custMap = {};
         d.customers?.customers?.forEach(c => custMap[c.id] = c.name);
 
@@ -249,14 +250,14 @@ async function fetchData() {
                 total: parseFloat(inv.total),
                 due: dueAmount,
                 status: inv.status,
-                is_delayed: isDelayed,
-                originalType: isDelayed ? 'delayed' : 'cash' // جديد: لتحديد النوع الأصلي
+                is_delayed: isDelayed
             };
         });
 
         localStorage.setItem(STORAGE.INVOICES, JSON.stringify(invoices));
         updateCreatorsList();
         renderCurrentTab();
+        
         btn.innerHTML = '<i class="fas fa-sync-alt"></i> تحديث';
         st.innerText = "✅ تم"; setTimeout(()=>st.innerText="", 2000);
 
@@ -267,10 +268,63 @@ async function fetchData() {
     } finally { btn.disabled = false; }
 }
 
-// باقي الوظائف (renderCurrentTab, getFilteredInvoices, addToDebt, removeFromDebt, renderExpenses, addExpense, delExpense, calculateStats, exportComprehensiveReport, updateCreatorsList, renderNicks, toggleSelect, toggleAll, rowClick, updateFloatingBar, switchTab) 
-// تظل كما هي مع تعديل getFilteredInvoices لتصفية الكاش والآجل حسب originalType وعدم تكرار الفواتير.
+// --- فلترة حسب التاب والبحث ---
+function getFilteredInvoices() {
+    const creator = document.getElementById("creatorFilter").value;
+    const search = document.getElementById("searchInput").value.toLowerCase();
 
-init();
-</script>
-</body>
-</html>
+    return invoices.filter(inv => {
+        if (inv.status === "Draft" || inv.status === "Voided") return false;
+        if (inv.due <= 0) return false;
+
+        let tabMatch = false;
+        if (currentTab === 'debt') tabMatch = debtIds.includes(inv.id);
+        else if (currentTab === 'delayed') tabMatch = inv.is_delayed && !debtIds.includes(inv.id);
+        else if (currentTab === 'cash') tabMatch = !inv.is_delayed && !debtIds.includes(inv.id);
+
+        const creatorMatch = (creator === 'all' || inv.creator === creator);
+        const searchMatch = inv.ref.toLowerCase().includes(search) || inv.customer.toLowerCase().includes(search);
+
+        return tabMatch && creatorMatch && searchMatch;
+    });
+}
+
+function renderCurrentTab() {
+    document.getElementById("tbl").style.display = (currentTab === 'expenses' || currentTab === 'nicks') ? 'none' : 'table';
+    document.getElementById("expensesDiv").style.display = (currentTab === 'expenses') ? 'block' : 'none';
+    document.getElementById("nicksDiv").style.display = (currentTab === 'nicks') ? 'block' : 'none';
+    
+    selectedIds.clear();
+    updateFloatingBar();
+    calculateStats();
+
+    if(currentTab === 'expenses') { renderExpenses(); return; }
+    if(currentTab === 'nicks') { renderNicks(); return; }
+
+    const data = getFilteredInvoices();
+    const tbody = document.getElementById("rows");
+    tbody.innerHTML = "";
+
+    if(data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:#999">لا توجد فواتير مستحقة</td></tr>`;
+        return;
+    }
+
+    let html = "";
+    data.forEach(inv => {
+        const nick = nicknames[inv.creator] || inv.creator;
+        let tag = inv.is_delayed ? '<span class="tag tag-delayed">آجلة</span>' : '<span class="tag tag-cash">كاش</span>';
+        if(debtIds.includes(inv.id)) tag = '<span class="tag tag-debt">في المديونية</span>';
+
+        let statusHtml = '<span style="color:#f39c12">معلقة</span>';
+        if(inv.status === 'Partially Paid' || (inv.due < inv.total)) statusHtml = '<span class="tag tag-part">مدفوعة جزئياً</span>';
+
+        let amountDisplay = `<span style="font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</span>`;
+        if(inv.due < inv.total) {
+            amountDisplay = `<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div><div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`;
+        }
+
+        html += `
+        <tr onclick="rowClick(event, ${inv.id})">
+            <td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td>
+            <td style="color:var(--p

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام التقرير الشامل (مديونية - آجل - مصروفات)</title>
+<title>نظام التقرير الشامل </title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -124,36 +124,76 @@ const TARGET_SKU_FALLBACK = "754500950512";
 const STORAGE = {INVOICES:"sys_inv_v6",DEBT_IDS:"sys_debt_v6",EXPENSES:"sys_exp_v6",NICKS:"sys_nicks_v6"};
 let invoices=[], debtIds=[], expenses=[], nicknames={}, selectedIds=new Set(), currentTab='delayed';
 
-function init(){invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");updateCreatorsList();renderCurrentTab();}
+function init(){
+    invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
+    debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");
+    expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
+    nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
+    updateCreatorsList();
+    renderCurrentTab();
+}
 
 async function fetchData(){
     const btn=document.getElementById("upBtn"),st=document.getElementById("status");
     btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> جاري الجلب...';
     try{
-        const r=await fetch(API_URL),d=await r.json(),targetId=d.target_product?.id;
-        const custMap={}; d.customers?.customers?.forEach(c=>custMap[c.id]=c.name);
+        const r=await fetch(API_URL);
+        if(!r.ok) throw new Error("Server Error");
+        const d=await r.json();
+        const targetId=d.target_product?.id;
+        const custMap={}; 
+        if(d.customers?.customers) d.customers.customers.forEach(c=>custMap[c.id]=c.name);
+        
         invoices=(d.invoices?.invoices||[]).map(inv=>{
             let isDelayed=false;
             if(targetId&&inv.line_items) isDelayed=inv.line_items.some(i=>i.product_id===targetId);
             else if(inv.line_items) isDelayed=inv.line_items.some(i=>i.sku===TARGET_SKU_FALLBACK||i.product_name?.includes("آجلة"));
-            let dueAmount=parseFloat(inv.due_amount); if(isNaN(dueAmount)) dueAmount=parseFloat(inv.total);
-            return {id:inv.id,ref:inv.reference,customer:custMap[inv.contact_id]||inv.contact_name||"عميل عام",creator:inv.created_by,date:inv.issue_date,total:parseFloat(inv.total),due:dueAmount,status:inv.status,is_delayed:isDelayed};
+            
+            let dueAmount=parseFloat(inv.due_amount); 
+            if(isNaN(dueAmount)) dueAmount=parseFloat(inv.total);
+            
+            return {
+                id:inv.id,
+                ref:inv.reference,
+                customer:custMap[inv.contact_id]||inv.contact_name||"عميل عام",
+                creator:inv.created_by,
+                date:inv.issue_date,
+                total:parseFloat(inv.total),
+                due:dueAmount,
+                status:inv.status,
+                is_delayed:isDelayed
+            };
         });
         localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
-        updateCreatorsList(); renderCurrentTab();
-        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="✅ تم"; setTimeout(()=>st.innerText="",2000);
-    }catch(e){console.error(e);btn.innerHTML='فشل';st.innerText="❌ خطأ";}finally{btn.disabled=false;}
+        updateCreatorsList(); 
+        renderCurrentTab();
+        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; 
+        st.innerText="✅ تم"; 
+        setTimeout(()=>st.innerText="",2000);
+    }catch(e){
+        console.error(e);
+        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث';
+        st.innerText="❌ خطأ";
+        alert("فشل جلب البيانات. تأكد من إعداد مفتاح API في Vercel.");
+    }finally{
+        btn.disabled=false;
+    }
 }
 
 function getFilteredInvoices(){
     const creator=document.getElementById("creatorFilter").value,search=document.getElementById("searchInput").value.toLowerCase();
     return invoices.filter(inv=>{
         if(inv.status==="Draft"||inv.status==="Voided"||inv.status==="Paid"||inv.due<=0) return false;
-        const inDebt=debtIds.includes(inv.id); let tabMatch=false;
+        
+        const inDebt=debtIds.includes(inv.id); 
+        let tabMatch=false;
         if(currentTab==='debt') tabMatch=inDebt;
         else if(currentTab==='delayed') tabMatch=inv.is_delayed&&!inDebt;
         else if(currentTab==='cash') tabMatch=!inv.is_delayed&&!inDebt;
-        const creatorMatch=(creator==='all'||inv.creator===creator),searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
+        
+        const creatorMatch=(creator==='all'||inv.creator===creator);
+        const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
+        
         return tabMatch&&creatorMatch&&searchMatch;
     });
 }
@@ -162,23 +202,250 @@ function renderCurrentTab(){
     document.getElementById("tbl").style.display=(currentTab==='expenses'||currentTab==='nicks')?'none':'table';
     document.getElementById("expensesDiv").style.display=(currentTab==='expenses')?'block':'none';
     document.getElementById("nicksDiv").style.display=(currentTab==='nicks')?'block':'none';
-    selectedIds.clear(); updateFloatingBar(); calculateStats();
+    
+    selectedIds.clear(); 
+    updateFloatingBar(); 
+    calculateStats();
+    
+    // تحديث حالة الأزرار
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    document.getElementById("tab-"+currentTab)?.classList.add("active");
+
     if(currentTab==='expenses'){renderExpenses();return;}
     if(currentTab==='nicks'){renderNicks();return;}
-    const data=getFilteredInvoices(); const tbody=document.getElementById("rows");tbody.innerHTML="";
-    if(data.length===0){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:30px;color:#999">لا توجد فواتير مستحقة</td></tr>`; return;}
+    
+    const data=getFilteredInvoices(); 
+    const tbody=document.getElementById("rows");
+    tbody.innerHTML="";
+    
+    if(data.length===0){
+        tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:30px;color:#999">لا توجد فواتير في هذا القسم</td></tr>`;
+        return;
+    }
+    
     data.forEach(inv=>{
         const nick=nicknames[inv.creator]||inv.creator;
         let tag=inv.is_delayed?'<span class="tag tag-delayed">آجلة</span>':'<span class="tag tag-cash">كاش</span>';
         if(debtIds.includes(inv.id)) tag='<span class="tag tag-debt">في المديونية</span>';
+        
         let statusHtml='<span style="color:#f39c12">معلقة</span>';
         if(inv.status==='Partially Paid'||inv.due<inv.total) statusHtml='<span class="tag tag-part">مدفوعة جزئياً</span>';
+        
         let amountDisplay=`<span style="font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</span>`;
-        if(inv.due<inv.total){amountDisplay=`<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div><div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`;}
-        tbody.innerHTML+=`<tr onclick="rowClick(event, ${inv.id})"><td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td><td style="color:var(--p);font-weight:bold">${inv.ref}</td><td>${inv.customer}</td><td>${nick}</td><td>${inv.date}</td><td>${tag}</td><td>${amountDisplay}</td><td>${statusHtml}</td></tr>`;
+        if(inv.due<inv.total){
+            amountDisplay=`<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div>
+                           <div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`;
+        }
+        
+        tbody.innerHTML+=`<tr onclick="rowClick(event, ${inv.id})">
+            <td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td>
+            <td style="color:var(--p);font-weight:bold">${inv.ref}</td>
+            <td>${inv.customer}</td>
+            <td>${nick}</td>
+            <td>${inv.date}</td>
+            <td>${tag}</td>
+            <td>${amountDisplay}</td>
+            <td>${statusHtml}</td>
+        </tr>`;
     });
 }
 
-// --- المصروفات ---
-function renderExpenses(){const creator=document.getElementById("creatorFilter").value;const tbody=document.getElementById("expenseRows");tbody.innerHTML="";expenses.filter(e=>creator==='all'||e.creator===creator).forEach(exp=>{const nick=nicknames[exp.creator]||exp.creator;tbody.innerHTML+=`<tr><td>${exp.desc}</td><td>${nick}</td><td>${exp.date}</td><td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td><td><button onclick="delExpense(${exp.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`;});}
-function addExpense(){const creator=document.getElementById("creatorFilter").value;if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}const desc=document.getElementById("expDesc").value,amount=parseFloat(document.getElementById("expAmount").value);if(!desc||!amount) return;expenses.push({id:Date.now
+function renderExpenses(){
+    const creator=document.getElementById("creatorFilter").value;
+    const tbody=document.getElementById("expenseRows");
+    tbody.innerHTML="";
+    expenses.filter(e=>creator==='all'||e.creator===creator).forEach(exp=>{
+        const nick=nicknames[exp.creator]||exp.creator;
+        tbody.innerHTML+=`<tr>
+            <td>${exp.desc}</td>
+            <td>${nick}</td>
+            <td>${exp.date}</td>
+            <td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td>
+            <td><button onclick="delExpense(${exp.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td>
+        </tr>`;
+    });
+}
+
+function addExpense(){
+    const creator=document.getElementById("creatorFilter").value;
+    if(creator==='all'){alert("يجب اختيار المندوب من القائمة العلوية أولاً لإضافة مصروف له!");return;}
+    const desc=document.getElementById("expDesc").value;
+    const amount=parseFloat(document.getElementById("expAmount").value);
+    
+    if(!desc||!amount) return;
+    
+    expenses.push({
+        id:Date.now(),
+        desc: desc,
+        amount: amount,
+        date: new Date().toISOString().split('T')[0],
+        creator: creator
+    });
+    
+    localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
+    document.getElementById("expDesc").value="";
+    document.getElementById("expAmount").value="";
+    renderExpenses();
+    calculateStats();
+}
+
+function delExpense(id){
+    if(!confirm("حذف المصروف؟"))return;
+    expenses=expenses.filter(e=>e.id!==id);
+    localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
+    renderExpenses();
+    calculateStats();
+}
+
+// --- دوال إدارة الأسماء المستعارة ---
+function renderNicks(){
+    // هذه الدالة تم دمج منطقها في updateCreatorsList لتحديث القائمة دائماً
+    updateCreatorsList(); 
+}
+
+function updateCreatorsList(){
+    const s=document.getElementById("creatorFilter");
+    const current=s.value;
+    // جلب جميع المنشئين من الفواتير والمصروفات
+    const allCreators = new Set();
+    invoices.forEach(i => allCreators.add(i.creator));
+    expenses.forEach(e => allCreators.add(e.creator));
+    
+    const creators=[...allCreators].filter(Boolean);
+    
+    // تحديث القائمة المنسدلة
+    s.innerHTML='<option value="all">كل المناديب</option>';
+    creators.forEach(c=>{
+        const n=nicknames[c]||c;
+        s.innerHTML+=`<option value="${c}">${n}</option>`;
+    });
+    s.value=current;
+    
+    // تحديث شاشة تخصيص الأسماء
+    const nickRows=document.getElementById("nickRows");
+    if(nickRows && currentTab === 'nicks'){
+        nickRows.innerHTML="";
+        creators.forEach(c=>{
+            const val=nicknames[c]||"";
+            nickRows.innerHTML+=`<div style="margin-bottom:10px; display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:5px;">
+                <span style="width:200px; font-weight:bold;">${c}</span>
+                <input type="text" placeholder="اكتب الاسم المختصر هنا" value="${val}" onchange="saveNick('${c}', this.value)" style="flex:1">
+            </div>`;
+        });
+    }
+}
+
+function saveNick(creator, val){
+    if(val) nicknames[creator]=val; else delete nicknames[creator];
+    localStorage.setItem(STORAGE.NICKS,JSON.stringify(nicknames));
+    updateCreatorsList(); // لتحديث القائمة العلوية فوراً
+}
+
+// --- دوال التحكم والتبديل ---
+function switchTab(tab){
+    currentTab=tab;
+    renderCurrentTab();
+}
+
+function toggleSelect(id){
+    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    updateFloatingBar();
+}
+
+function toggleAll(source){
+    const checkboxes=document.querySelectorAll('.row-chk');
+    checkboxes.forEach(c=>{
+        c.checked=source.checked;
+        const id=parseInt(c.value);
+        if(source.checked) selectedIds.add(id); else selectedIds.delete(id);
+    });
+    updateFloatingBar();
+}
+
+function rowClick(e, id){
+    if(e.target.tagName==='INPUT' || e.target.tagName==='BUTTON') return;
+    const chk=document.querySelector(`input[value="${id}"]`);
+    if(chk) { chk.checked=!chk.checked; toggleSelect(id); }
+}
+
+function updateFloatingBar(){
+    const bar=document.getElementById("floatBar");
+    document.getElementById("selCount").innerText=selectedIds.size;
+    
+    if(selectedIds.size>0){
+        bar.classList.add("show");
+        const actionsDiv=document.getElementById("actionButtons");
+        
+        let buttonsHTML = "";
+        
+        if(currentTab==='delayed'){
+             buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
+             buttonsHTML+=`<button onclick="markAsCash()" style="background:#27ae60">تحويل كاش (تعديل يدوي)</button>`;
+        } else if(currentTab==='debt'){
+             buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
+        } else if(currentTab==='cash'){
+             buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل (تعديل يدوي)</button>`;
+             buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
+        }
+        actionsDiv.innerHTML = buttonsHTML;
+        
+    } else {
+        bar.classList.remove("show");
+    }
+}
+
+// --- منطق النقل والحسابات ---
+function moveToDebt(){
+    selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); });
+    localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
+    renderCurrentTab();
+}
+
+function removeFromDebt(){
+    debtIds=debtIds.filter(id=>!selectedIds.has(id));
+    localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
+    renderCurrentTab();
+}
+
+function markAsCash(){
+    invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=false; });
+    localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
+    renderCurrentTab();
+}
+
+function markAsDelayed(){
+    invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; });
+    localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
+    renderCurrentTab();
+}
+
+function calculateStats(){
+    const activeInvoices = invoices.filter(i=>i.status!=='Paid' && i.status!=='Voided' && i.status!=='Draft' && i.due > 0);
+    
+    const totalDelayed = activeInvoices.filter(i=>i.is_delayed && !debtIds.includes(i.id)).reduce((a,b)=>a+b.due,0);
+    const totalDebt = activeInvoices.filter(i=>debtIds.includes(i.id)).reduce((a,b)=>a+b.due,0);
+    const totalExp = expenses.reduce((a,b)=>a+b.amount,0);
+    
+    document.getElementById("stat-delayed").innerText = totalDelayed.toLocaleString();
+    document.getElementById("stat-debt").innerText = totalDebt.toLocaleString();
+    document.getElementById("stat-expense").innerText = totalExp.toLocaleString();
+    
+    // الصافي = (الآجل + المديونية) - المصروفات
+    document.getElementById("stat-net").innerText = (totalDelayed + totalDebt - totalExp).toLocaleString();
+
+    // Badges (Counts)
+    document.getElementById("badge-delayed").innerText = activeInvoices.filter(i=>i.is_delayed && !debtIds.includes(i.id)).length;
+    document.getElementById("badge-debt").innerText = debtIds.length; // هنا نعرض عدد المديونيات المحفوظة سواء كانت مدفوعة أم لا، أو يمكن تصفيتها
+    document.getElementById("badge-cash").innerText = activeInvoices.filter(i=>!i.is_delayed && !debtIds.includes(i.id)).length;
+    document.getElementById("badge-expenses").innerText = expenses.length;
+}
+
+function exportComprehensiveReport(){
+    alert("لتفعيل التصدير لملف Excel، تحتاج إلى إضافة مكتبة SheetJS. حالياً يمكنك نسخ البيانات من الجدول.");
+}
+
+// بدء التشغيل
+init();
+</script>
+</body>
+</html>

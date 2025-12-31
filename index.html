@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام التقرير الشامل المطور (Excel ملون)</title>
+<title>نظام التقرير الشامل المطور (Excel ذكي)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,7 +47,7 @@ tr:last-child td {border-bottom: none;}
 .tag-delayed {background: #e8f6fd; color: var(--p);}
 .tag-cash {background: #eafaf1; color: var(--g);}
 .tag-debt {background: #fdeaea; color: var(--r);}
-.tag-pending {background: #f3e5f5; color: var(--pending);} /* ستايل جديد للانتظار */
+.tag-pending {background: #f3e5f5; color: var(--pending);}
 .tag-part {background: #fff3cd; color: #856404;}
 
 .floating-bar {position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--d); color: #fff; padding: 15px 30px; border-radius: 50px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000; transition: 0.4s; opacity: 0;}
@@ -84,7 +84,7 @@ tr:last-child td {border-bottom: none;}
     </div>
 
     <div style="display: flex; gap: 10px;">
-        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير (Excel) ملون</button>
+        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير (Excel) ذكي</button>
         <button onclick="saveToHistory()" class="save-archive"><i class="fas fa-save"></i> حفظ المديونية للأرشيف</button>
     </div>
 
@@ -95,7 +95,6 @@ tr:last-child td {border-bottom: none;}
         <button class="tab" id="tab-cash" onclick="switchTab('cash')"><i class="fas fa-wallet"></i> نقدية<span id="badge-cash" class="tab-badge">0</span></button>
         <button class="tab" id="tab-debt" onclick="switchTab('debt')"><i class="fas fa-file-invoice-dollar"></i> المديونية<span id="badge-debt" class="tab-badge">0</span></button>
         <button class="tab" id="tab-pending" onclick="switchTab('pending')" style="color:var(--pending); border-bottom-color:transparent;"><i class="fas fa-exchange-alt"></i> بانتظار التحويل<span id="badge-pending" class="tab-badge">0</span></button>
-        
         <button class="tab" id="tab-expenses" onclick="switchTab('expenses')"><i class="fas fa-gas-pump"></i> المصروفات<span id="badge-expenses" class="tab-badge">0</span></button>
         <button class="tab" id="tab-nicks" onclick="switchTab('nicks')"><i class="fas fa-user-tag"></i> المناديب</button>
         <button class="tab" id="tab-history" onclick="switchTab('history')"><i class="fas fa-history"></i> الأرشيف</button>
@@ -150,7 +149,6 @@ tr:last-child td {border-bottom: none;}
 <script>
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
-// إضافة pendingIds في التخزين
 const STORAGE = {INVOICES:"sys_inv_v6", DEBT_IDS:"sys_debt_v6", PENDING_IDS:"sys_pending_v1", EXPENSES:"sys_exp_v6", NICKS:"sys_nicks_v6", HISTORY:"sys_hist_v1"};
 
 let invoices=[], debtIds=[], pendingIds=[], expenses=[], nicknames={}, historyLog=[], selectedIds=new Set(), currentTab='delayed';
@@ -159,7 +157,7 @@ let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, pending: 0 };
 function init(){
     invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
     debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");
-    pendingIds=JSON.parse(localStorage.getItem(STORAGE.PENDING_IDS)||"[]"); // تحميل المعلقات
+    pendingIds=JSON.parse(localStorage.getItem(STORAGE.PENDING_IDS)||"[]"); 
     expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
     nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
     historyLog=JSON.parse(localStorage.getItem(STORAGE.HISTORY)||"[]");
@@ -237,13 +235,13 @@ function getFilteredInvoices(){
 
         let tabMatch=false;
         if(currentTab==='pending') {
-            tabMatch = isPending; // هذا التبويب للمنتظر فقط
+            tabMatch = isPending; 
         } else if(currentTab==='debt') {
-            tabMatch = isDebt && !isPending; // مديونية وليست منتظرة
+            tabMatch = isDebt && !isPending;
         } else if(currentTab==='delayed') {
-            tabMatch = inv.is_delayed && !isDebt && !isPending; // آجل وليس دين وليس منتظر
+            tabMatch = inv.is_delayed && !isDebt && !isPending;
         } else if(currentTab==='cash') {
-            tabMatch = !inv.is_delayed && !isDebt && !isPending; // كاش وليس دين وليس منتظر
+            tabMatch = !inv.is_delayed && !isDebt && !isPending;
         }
         
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
@@ -261,23 +259,19 @@ function calculateStats(){
     const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
     const isCreator = (inv) => (creator === 'all' || inv.creator === creator);
 
-    // 1. حساب المنتظر (Pending)
     const pendingInvoices = invoices.filter(inv => pendingIds.includes(inv.id) && isCreator(inv) && isActive(inv));
     const totalPending = pendingInvoices.reduce((a,b) => a + b.due, 0);
 
-    // 2. حساب المديونية (Debt) - نستثني المنتظر
     const debtInvoices = invoices.filter(inv => {
         return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isCreator(inv) && isActive(inv);
     });
     const totalDebt = debtInvoices.reduce((a, b) => a + b.due, 0);
 
-    // 3. حساب الآجل (Delayed) - نستثني المنتظر والديون
     const delayedInvoices = invoices.filter(inv => {
         return inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isCreator(inv) && isActive(inv);
     });
     const totalDelayed = delayedInvoices.reduce((a, b) => a + b.due, 0);
 
-    // 4. حساب الكاش (Cash)
     const cashInvoices = invoices.filter(inv => {
         return !inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isCreator(inv) && isActive(inv);
     });
@@ -288,13 +282,13 @@ function calculateStats(){
     document.getElementById("stat-debt").innerText = totalDebt.toLocaleString();
     document.getElementById("stat-expense").innerText = totalExp.toLocaleString();
     document.getElementById("stat-net").innerText = net.toLocaleString();
-    document.getElementById("stat-pending").innerText = totalPending.toLocaleString(); // عرض المنتظر
+    document.getElementById("stat-pending").innerText = totalPending.toLocaleString();
 
     document.getElementById("badge-delayed").innerText = delayedInvoices.length;
     document.getElementById("badge-debt").innerText = debtInvoices.length;
     document.getElementById("badge-expenses").innerText = filteredExpenses.length;
     document.getElementById("badge-cash").innerText = cashInvoices.length;
-    document.getElementById("badge-pending").innerText = pendingInvoices.length; // بادج المنتظر
+    document.getElementById("badge-pending").innerText = pendingInvoices.length;
 
     currentStats = { debt: totalDebt, expenses: totalExp, net: net, delayed: totalDelayed, pending: totalPending };
 }
@@ -438,11 +432,9 @@ function updateFloatingBar(){
         const actionsDiv=document.getElementById("actionButtons");
         let buttonsHTML = "";
         
-        // إذا كنا في تبويب الانتظار
         if(currentTab === 'pending') {
              buttonsHTML+=`<button onclick="removeFromPending()" style="background:#f39c12">إعادة للفواتير الأصلية</button>`;
         } else {
-             // الأزرار الحالية
              if(currentTab==='delayed'){
                   buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
              } else if(currentTab==='debt'){
@@ -451,7 +443,6 @@ function updateFloatingBar(){
                   buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button>`;
                   buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
              }
-             // زر النقل للانتظار يظهر في كل التبويبات ما عدا تبويب الانتظار نفسه
              buttonsHTML+=`<button onclick="moveToPending()" style="background:var(--pending); margin-right:10px;">نقل للانتظار</button>`;
         }
         
@@ -461,7 +452,6 @@ function updateFloatingBar(){
     }
 }
 
-// دالة النقل لقائمة الانتظار
 function moveToPending(){
     selectedIds.forEach(id=>{ 
         if(!pendingIds.includes(id)) pendingIds.push(id); 
@@ -470,7 +460,6 @@ function moveToPending(){
     calculateStats(); renderCurrentTab();
 }
 
-// دالة الإزالة من قائمة الانتظار
 function removeFromPending(){
     pendingIds = pendingIds.filter(id => !selectedIds.has(id));
     localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds));
@@ -536,7 +525,6 @@ function saveToHistory(){
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toLocaleString('ar-EG');
     
-    // إعداد البيانات
     const activeDebtInvoices = invoices.filter(inv => {
         return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
     });
@@ -613,11 +601,11 @@ function deleteHistoryItem(id){
 
 function exportHistoryItem(item){
     generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.delayedInvoices, item.pendingInvoices || [], 
-                 {debt: item.totalDebt, expenses: item.totalExp, net: item.net, pending: item.totalPending || 0}, item.saveDate);
+                 {debt: item.totalDebt, expenses: item.totalExp, net: item.net, pending: item.totalPending || 0, delayed: 0}, item.saveDate);
 }
 
 // ============================================
-// نظام التصدير الملون (ExcelJS)
+// نظام التصدير الملون (معادلات حية)
 // ============================================
 
 function exportToExcel(isHistory = false) {
@@ -627,7 +615,6 @@ function exportToExcel(isHistory = false) {
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toISOString().split('T')[0];
 
-    // الفلترة للتصدير
     const debtInvoices = invoices.filter(inv => {
         return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
     });
@@ -656,7 +643,6 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, pendingIn
         { header: 'المبلغ', key: 'col4', width: 15 }
     ];
 
-    // --- العنوان ---
     sheet.addRow(['التقرير المالي الشامل']);
     sheet.mergeCells('A1:D1');
     const titleRow = sheet.getRow(1);
@@ -668,19 +654,24 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, pendingIn
     sheet.getRow(2).font = { bold: true };
     sheet.addRow([]);
 
-    // --- الملخص ---
     const summaryHeader = sheet.addRow(['ملخص الحسابات']);
     summaryHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     summaryHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF2980B9'} }; 
     
-    sheet.addRow(['إجمالي المديونية المختارة', '', '', stats.debt]);
-    sheet.addRow(['إجمالي المصروفات', '', '', stats.expenses]);
-    const netRow = sheet.addRow(['الصافي المستحق (مديونية - مصروفات)', '', '', stats.net]);
-    netRow.font = { bold: true, size: 12 };
-    netRow.getCell(4).font = { bold: true, color: { argb: 'FF0000FF' } };
+    // صفوف الملخص مع قيم مبدئية 0
+    const rowDebtSummary = sheet.addRow(['إجمالي المديونية المختارة', '', '', 0]); 
+    const rowExpSummary = sheet.addRow(['إجمالي المصروفات', '', '', 0]);
+    const rowNetSummary = sheet.addRow(['الصافي المستحق (مديونية - مصروفات)', '', '', 0]);
+    
+    rowNetSummary.font = { bold: true, size: 12 };
+    rowNetSummary.getCell(4).font = { bold: true, color: { argb: 'FF0000FF' } };
     sheet.addRow([]);
 
-    // --- المديونية ---
+    let debtRange = null;
+    let expRange = null;
+    let pendingRange = null;
+
+    // --- 1. جدول المديونية ---
     const debtHeader = sheet.addRow(['تفاصيل فواتير المديونية (تدخل في الحساب)']);
     sheet.mergeCells(`A${debtHeader.number}:D${debtHeader.number}`);
     debtHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -691,14 +682,23 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, pendingIn
     debtCols.font = { bold: true };
     debtCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
 
-    debtInvs.forEach(inv => {
-        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
-    });
-    const debtTotalRow = sheet.addRow(['المجموع', '', '', stats.debt]);
-    debtTotalRow.font = { bold: true };
+    const startDebtRow = sheet.lastRow.number + 1;
+    if (debtInvs.length > 0) {
+        debtInvs.forEach(inv => {
+            sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
+        });
+        const endDebtRow = sheet.lastRow.number;
+        debtRange = `D${startDebtRow}:D${endDebtRow}`;
+
+        const debtTotalRow = sheet.addRow(['المجموع', '', '', { formula: `SUM(${debtRange})`, result: stats.debt }]);
+        debtTotalRow.font = { bold: true };
+    } else {
+        sheet.addRow(['لا يوجد بيانات', '-', '-', 0]);
+        debtRange = `D${sheet.lastRow.number}`;
+    }
     sheet.addRow([]);
 
-    // --- المصروفات ---
+    // --- 2. جدول المصروفات ---
     const expHeader = sheet.addRow(['تفاصيل المصروفات']);
     sheet.mergeCells(`A${expHeader.number}:D${expHeader.number}`);
     expHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -709,35 +709,46 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, pendingIn
     expCols.font = { bold: true };
     expCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
 
-    exps.forEach(exp => {
-        sheet.addRow([exp.desc, name, exp.date, exp.amount]);
-    });
-    const expTotalRow = sheet.addRow(['المجموع', '', '', stats.expenses]);
-    expTotalRow.font = { bold: true };
+    const startExpRow = sheet.lastRow.number + 1;
+    if (exps.length > 0) {
+        exps.forEach(exp => {
+            sheet.addRow([exp.desc, name, exp.date, exp.amount]);
+        });
+        const endExpRow = sheet.lastRow.number;
+        expRange = `D${startExpRow}:D${endExpRow}`;
+
+        const expTotalRow = sheet.addRow(['المجموع', '', '', { formula: `SUM(${expRange})`, result: stats.expenses }]);
+        expTotalRow.font = { bold: true };
+    } else {
+        sheet.addRow(['لا يوجد مصروفات', '-', '-', 0]);
+        expRange = `D${sheet.lastRow.number}`;
+    }
     sheet.addRow([]);
 
-    // --- جدول الانتظار المنفصل (جديد) ---
+    // --- 3. جدول الانتظار ---
     if(pendingInvs && pendingInvs.length > 0){
-        sheet.addRow([]);
         const pendingHeader = sheet.addRow(['فواتير بانتظار التحويل (منفصلة - لا تدخل في الحساب)']);
         sheet.mergeCells(`A${pendingHeader.number}:D${pendingHeader.number}`);
         pendingHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        pendingHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF8E44AD'} }; // لون بنفسجي
+        pendingHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF8E44AD'} }; 
         pendingHeader.alignment = { horizontal: 'center' };
 
         const pendingCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']);
         pendingCols.font = { bold: true };
 
+        const startPendRow = sheet.lastRow.number + 1;
         pendingInvs.forEach(inv => {
             sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
         });
-        const pendingTotalRow = sheet.addRow(['إجمالي الانتظار', '', '', stats.pending]);
+        const endPendRow = sheet.lastRow.number;
+        pendingRange = `D${startPendRow}:D${endPendRow}`;
+
+        const pendingTotalRow = sheet.addRow(['إجمالي الانتظار', '', '', { formula: `SUM(${pendingRange})`, result: stats.pending }]);
         pendingTotalRow.font = { bold: true };
         sheet.addRow([]);
     }
 
-    // --- الآجل ---
-    const totalDelayed = delayedInvs.reduce((a,b)=>a+b.due,0);
+    // --- 4. جدول الآجل ---
     const delayHeader = sheet.addRow(['الفواتير الآجلة المتبقية (للعلم فقط)']);
     sheet.mergeCells(`A${delayHeader.number}:D${delayHeader.number}`);
     delayHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -747,16 +758,33 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, pendingIn
     const delayCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']);
     delayCols.font = { bold: true };
 
-    delayedInvs.forEach(inv => {
-        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
-    });
-    const delayTotalRow = sheet.addRow(['إجمالي الآجل', '', '', totalDelayed]);
-    delayTotalRow.font = { bold: true };
+    const startDelayRow = sheet.lastRow.number + 1;
+    let delayRange = `D${startDelayRow}`;
+    if (delayedInvs.length > 0) {
+        delayedInvs.forEach(inv => {
+            sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
+        });
+        const endDelayRow = sheet.lastRow.number;
+        delayRange = `D${startDelayRow}:D${endDelayRow}`;
+        
+        sheet.addRow(['إجمالي الآجل', '', '', { formula: `SUM(${delayRange})`, result: stats.delayed }]);
+    } else {
+        sheet.addRow(['لا يوجد آجل', '-', '-', 0]);
+    }
 
-    // --- الحفظ والتنزيل ---
+    // ==========================================
+    // تحديث الملخص العلوي بالمعادلات
+    // ==========================================
+    rowDebtSummary.getCell(4).value = { formula: `SUM(${debtRange})`, result: stats.debt };
+    rowExpSummary.getCell(4).value = { formula: `SUM(${expRange})`, result: stats.expenses };
+    rowNetSummary.getCell(4).value = { 
+        formula: `SUM(${debtRange}) - SUM(${expRange})`, 
+        result: stats.net 
+    };
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `تقرير_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);
+    saveAs(blob, `تقرير_ذكي_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);
 }
 
 init();

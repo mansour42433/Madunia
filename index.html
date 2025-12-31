@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام التقرير الشامل المطور</title>
+<title>نظام التقرير الشامل المطور (Excel ملون)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <style>
-:root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9}
+/* تمت إضافة اللون البنفسجي --custom */
+:root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9; --custom: #8e44ad;}
 body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 120px;}
 .box{background:#fff;padding:25px;border-radius:15px;max-width:1400px;margin:auto;box-shadow: 0 4px 20px rgba(0,0,0,0.05)}
 h2{margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center}
@@ -37,6 +38,11 @@ button.export-all {background: #27ae60; width: 100%; justify-content: center; fo
 .tab.active{color:var(--p);border-bottom-color:var(--p); background: rgba(41, 128, 185, 0.05);}
 .tab-badge {background: #eee; color: #555; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-right: 5px;}
 
+/* تنسيق التبويب المخصص الجديد */
+.tab-custom-style.active {color: var(--custom); border-bottom-color: var(--custom); background: rgba(142, 68, 173, 0.05);}
+.edit-icon {font-size: 0.8em; margin-right: 5px; color: #ccc; cursor: pointer;}
+.edit-icon:hover {color: var(--custom);}
+
 .table-responsive {overflow-x: auto; background: #fff; border-radius: 0 0 15px 15px; border: 1px solid #ddd; border-top: none; min-height: 300px;}
 table{width:100%;border-collapse:collapse; min-width:1000px;}
 th{background:#f8f9fa;color:var(--d);padding:15px; text-align: right; font-weight: 700;}
@@ -48,14 +54,15 @@ tr:last-child td {border-bottom: none;}
 .tag-cash {background: #eafaf1; color: var(--g);}
 .tag-debt {background: #fdeaea; color: var(--r);}
 .tag-part {background: #fff3cd; color: #856404;}
+.tag-custom {background: #f4ecf7; color: var(--custom);} /* تاج جديد */
 
 .floating-bar {position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--d); color: #fff; padding: 15px 30px; border-radius: 50px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000; transition: 0.4s; opacity: 0;}
 .floating-bar.show {transform: translateX(-50%) translateY(0); opacity: 1;}
 
 .expense-form {display: flex; gap: 10px; background: #fff5f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
 .expense-form div {flex: 1;}
+.expense-form label {display: block; font-size: 0.8em; margin-bottom: 5px; color: #c0392b;}
 
-/* تنسيق الأرشيف */
 .history-item {border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd;}
 .history-info strong {display: block; font-size: 1.1em; color: var(--d);}
 .history-info span {color: #777; font-size: 0.9em;}
@@ -77,7 +84,7 @@ tr:last-child td {border-bottom: none;}
         <div class="card" style="background:var(--r)"><i class="fas fa-wallet"></i><h3>المديونية (المختارة)</h3><span id="stat-debt" class="card-val">0</span></div>
         <div class="card" style="background:#c0392b"><i class="fas fa-minus-circle"></i><h3>المصروفات</h3><span id="stat-expense" class="card-val">0</span></div>
         <div class="card" style="background:var(--d)"><i class="fas fa-calculator"></i><h3>الصافي المستحق</h3><span id="stat-net" class="card-val">0</span></div>
-        <div class="card" style="background:var(--p); opacity: 0.8;"><i class="fas fa-star"></i><h3>آجل (للمعلومة فقط)</h3><span id="stat-delayed" class="card-val">0</span></div>
+        <div class="card" style="background:var(--custom); opacity: 0.9;"><i class="fas fa-folder"></i><h3 id="stat-custom-title">مخصص</h3><span id="stat-custom" class="card-val">0</span></div>
     </div>
 
     <div style="display: flex; gap: 10px;">
@@ -91,6 +98,13 @@ tr:last-child td {border-bottom: none;}
         <button class="tab active" id="tab-delayed" onclick="switchTab('delayed')"><i class="fas fa-star"></i> الآجلة (تلقائي)<span id="badge-delayed" class="tab-badge">0</span></button>
         <button class="tab" id="tab-cash" onclick="switchTab('cash')"><i class="fas fa-wallet"></i> نقدية / كاش<span id="badge-cash" class="tab-badge">0</span></button>
         <button class="tab" id="tab-debt" onclick="switchTab('debt')"><i class="fas fa-file-invoice-dollar"></i> المديونية المختارة<span id="badge-debt" class="tab-badge">0</span></button>
+        
+        <button class="tab tab-custom-style" id="tab-custom" onclick="switchTab('custom')">
+            <i class="fas fa-folder"></i> <span id="customTabNameDisplay">مخصص</span> 
+            <i class="fas fa-pen edit-icon" onclick="renameCustomTab(event)"></i>
+            <span id="badge-custom" class="tab-badge">0</span>
+        </button>
+
         <button class="tab" id="tab-expenses" onclick="switchTab('expenses')"><i class="fas fa-gas-pump"></i> المصروفات<span id="badge-expenses" class="tab-badge">0</span></button>
         <button class="tab" id="tab-nicks" onclick="switchTab('nicks')"><i class="fas fa-user-tag"></i> المناديب</button>
         <button class="tab" id="tab-history" onclick="switchTab('history')"><i class="fas fa-history"></i> الأرشيف</button>
@@ -139,15 +153,27 @@ tr:last-child td {border-bottom: none;}
 
 <div class="floating-bar" id="floatBar">
     <div>تم تحديد: <span id="selCount">0</span></div>
-    <div id="actionButtons" style="margin-right:20px"></div>
+    <div id="actionButtons" style="margin-right:20px; display:flex; gap:10px"></div>
 </div>
 
 <script>
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
-const STORAGE = {INVOICES:"sys_inv_v6",DEBT_IDS:"sys_debt_v6",EXPENSES:"sys_exp_v6",NICKS:"sys_nicks_v6", HISTORY:"sys_hist_v1"};
+// تحديث التخزين ليشمل التبويب المخصص
+const STORAGE = {
+    INVOICES:"sys_inv_v6",
+    DEBT_IDS:"sys_debt_v6",
+    EXPENSES:"sys_exp_v6",
+    NICKS:"sys_nicks_v6", 
+    HISTORY:"sys_hist_v1",
+    CUSTOM_IDS: "sys_cust_ids_v1", 
+    CUSTOM_NAME: "sys_cust_name_v1"
+};
+
 let invoices=[], debtIds=[], expenses=[], nicknames={}, historyLog=[], selectedIds=new Set(), currentTab='delayed';
-let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0 };
+let customIds = []; // مصفوفة جديدة للمخصص
+let customTabName = "القائمة الخاصة";
+let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, custom: 0 };
 
 function init(){
     invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
@@ -156,9 +182,28 @@ function init(){
     nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
     historyLog=JSON.parse(localStorage.getItem(STORAGE.HISTORY)||"[]");
     
+    // تحميل بيانات المخصص
+    customIds = JSON.parse(localStorage.getItem(STORAGE.CUSTOM_IDS)||"[]");
+    customTabName = localStorage.getItem(STORAGE.CUSTOM_NAME) || "القائمة الخاصة";
+    
+    updateCustomTabNameUI();
     updateCreatorsList();
     calculateStats(); 
     renderCurrentTab();
+}
+
+function updateCustomTabNameUI(){
+    document.getElementById("customTabNameDisplay").innerText = customTabName;
+    document.getElementById("stat-custom-title").innerText = customTabName + " (غير محتسب)";
+}
+function renameCustomTab(e){
+    e.stopPropagation();
+    const newName = prompt("أدخل الاسم الجديد للتبويب:", customTabName);
+    if(newName && newName.trim() !== ""){
+        customTabName = newName.trim();
+        localStorage.setItem(STORAGE.CUSTOM_NAME, customTabName);
+        updateCustomTabNameUI();
+    }
 }
 
 async function fetchData(){
@@ -203,7 +248,7 @@ async function fetchData(){
         console.error(e);
         btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث';
         st.innerText="❌ خطأ";
-        alert("فشل جلب البيانات. تأكد من إعداد مفتاح API في Vercel.");
+        alert("فشل جلب البيانات.");
     }finally{
         btn.disabled=false;
     }
@@ -217,14 +262,19 @@ function getFilteredInvoices(){
     
     return invoices.filter(inv=>{
         if(inv.status==="Draft"||inv.status==="Voided"||inv.status==="Paid"||inv.due<=0) return false;
+        
         const creatorMatch=(creator==='all'||inv.creator===creator);
         if(!creatorMatch) return false;
 
-        const inDebt=debtIds.includes(inv.id); 
+        const inDebt=debtIds.includes(inv.id);
+        const inCustom=customIds.includes(inv.id); // تحقق من القائمة المخصصة
+
         let tabMatch=false;
-        if(currentTab==='debt') tabMatch=inDebt;
-        else if(currentTab==='delayed') tabMatch=inv.is_delayed&&!inDebt;
-        else if(currentTab==='cash') tabMatch=!inv.is_delayed&&!inDebt;
+        // منطق التبويبات الجديد
+        if(currentTab==='custom') tabMatch=inCustom;
+        else if(currentTab==='debt') tabMatch=inDebt && !inCustom; // لا تظهر هنا إذا كانت في المخصص
+        else if(currentTab==='delayed') tabMatch=inv.is_delayed && !inDebt && !inCustom;
+        else if(currentTab==='cash') tabMatch=!inv.is_delayed && !inDebt && !inCustom;
         
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
         return tabMatch&&searchMatch;
@@ -236,19 +286,22 @@ function calculateStats(){
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     const totalExp = filteredExpenses.reduce((a, b) => a + b.amount, 0);
 
-    const debtInvoices = invoices.filter(inv => {
-        return debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
-    });
+    const isValid = (inv) => (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
+
+    // حساب المديونية (باستثناء المخصص)
+    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !customIds.includes(inv.id) && isValid(inv));
     const totalDebt = debtInvoices.reduce((a, b) => a + b.due, 0);
 
-    const delayedInvoices = invoices.filter(inv => {
-        return inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
-    });
+    // حساب الآجل (باستثناء المديونية والمخصص)
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !customIds.includes(inv.id) && isValid(inv));
     const totalDelayed = delayedInvoices.reduce((a, b) => a + b.due, 0);
 
-    const cashInvoices = invoices.filter(inv => {
-        return !inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
-    });
+    // حساب المخصص (منفصل)
+    const customInvoices = invoices.filter(inv => customIds.includes(inv.id) && isValid(inv));
+    const totalCustom = customInvoices.reduce((a, b) => a + b.due, 0);
+
+    // الكاش
+    const cashInvoices = invoices.filter(inv => !inv.is_delayed && !debtIds.includes(inv.id) && !customIds.includes(inv.id) && isValid(inv));
 
     const net = totalDebt - totalExp;
 
@@ -256,13 +309,15 @@ function calculateStats(){
     document.getElementById("stat-debt").innerText = totalDebt.toLocaleString();
     document.getElementById("stat-expense").innerText = totalExp.toLocaleString();
     document.getElementById("stat-net").innerText = net.toLocaleString();
+    document.getElementById("stat-custom").innerText = totalCustom.toLocaleString();
 
     document.getElementById("badge-delayed").innerText = delayedInvoices.length;
     document.getElementById("badge-debt").innerText = debtInvoices.length;
     document.getElementById("badge-expenses").innerText = filteredExpenses.length;
     document.getElementById("badge-cash").innerText = cashInvoices.length;
+    document.getElementById("badge-custom").innerText = customInvoices.length;
 
-    currentStats = { debt: totalDebt, expenses: totalExp, net: net, delayed: totalDelayed };
+    currentStats = { debt: totalDebt, expenses: totalExp, net: net, delayed: totalDelayed, custom: totalCustom };
 }
 
 function renderCurrentTab(){
@@ -294,8 +349,12 @@ function renderCurrentTab(){
     
     data.forEach(inv=>{
         const nick=nicknames[inv.creator]||inv.creator;
-        let tag=inv.is_delayed?'<span class="tag tag-delayed">آجلة</span>':'<span class="tag tag-cash">كاش</span>';
-        if(debtIds.includes(inv.id)) tag='<span class="tag tag-debt">في المديونية</span>';
+        let tag;
+        // التلوين
+        if(customIds.includes(inv.id)) tag=`<span class="tag tag-custom">${customTabName}</span>`;
+        else if(debtIds.includes(inv.id)) tag='<span class="tag tag-debt">في المديونية</span>';
+        else if(inv.is_delayed) tag='<span class="tag tag-delayed">آجلة</span>';
+        else tag='<span class="tag tag-cash">كاش</span>';
         
         let statusHtml='<span style="color:#f39c12">معلقة</span>';
         if(inv.status==='Partially Paid'||inv.due<inv.total) statusHtml='<span class="tag tag-part">مدفوعة جزئياً</span>';
@@ -325,7 +384,7 @@ function renderExpenses(){
 }
 function addExpense(){
     const creator=document.getElementById("creatorFilter").value;
-    if(creator==='all'){alert("يجب اختيار المندوب من القائمة العلوية أولاً!");return;}
+    if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}
     const desc=document.getElementById("expDesc").value;
     const amount=parseFloat(document.getElementById("expAmount").value);
     if(!desc||!amount) return;
@@ -335,7 +394,7 @@ function addExpense(){
     calculateStats(); renderExpenses();
 }
 function delExpense(id){
-    if(!confirm("حذف المصروف؟"))return;
+    if(!confirm("حذف؟"))return;
     expenses=expenses.filter(e=>e.id!==id);
     localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
     calculateStats(); renderExpenses();
@@ -352,22 +411,57 @@ function toggleAll(source){
     checkboxes.forEach(c=>{ c.checked=source.checked; const id=parseInt(c.value); if(source.checked) selectedIds.add(id); else selectedIds.delete(id); });
     updateFloatingBar();
 }
-function rowClick(e, id){ if(e.target.tagName!=='INPUT' && e.target.tagName!=='BUTTON') { const chk=document.querySelector(`input[value="${id}"]`); if(chk){chk.checked=!chk.checked; toggleSelect(id);} } }
+function rowClick(e, id){ 
+    if(e.target.tagName==='INPUT' || e.target.tagName==='BUTTON' || e.target.tagName==='I') return;
+    const chk=document.querySelector(`input[value="${id}"]`); if(chk){chk.checked=!chk.checked; toggleSelect(id);} 
+}
+
 function updateFloatingBar(){
     const bar=document.getElementById("floatBar"); document.getElementById("selCount").innerText=selectedIds.size;
     if(selectedIds.size>0){
         bar.classList.add("show");
         const actionsDiv=document.getElementById("actionButtons");
         let buttonsHTML = "";
+        
+        // زر النقل للقائمة الخاصة
+        if(currentTab !== 'custom') buttonsHTML += `<button onclick="moveToCustom()" style="background:#8e44ad"><i class="fas fa-folder-plus"></i> نقل إلى ${customTabName}</button>`;
+
         if(currentTab==='delayed') buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
         else if(currentTab==='debt') buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
         else if(currentTab==='cash') { buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button><button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`; }
+        else if(currentTab==='custom') buttonsHTML+=`<button onclick="removeFromCustom()" style="background:#7f8c8d"><i class="fas fa-undo"></i> إزالة من ${customTabName}</button>`;
+        
         actionsDiv.innerHTML = buttonsHTML;
     } else { bar.classList.remove("show"); }
 }
-function moveToDebt(){ selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); }); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
-function removeFromDebt(){ debtIds=debtIds.filter(id=>!selectedIds.has(id)); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
+
+function moveToDebt(){ 
+    selectedIds.forEach(id=>{ 
+        if(!debtIds.includes(id)) debtIds.push(id); 
+        if(customIds.includes(id)) customIds = customIds.filter(cid => cid !== id); // إزالة من المخصص إذا نقل للمديونية
+    }); 
+    saveAllStorage(); calculateStats(); renderCurrentTab(); 
+}
+function removeFromDebt(){ debtIds=debtIds.filter(id=>!selectedIds.has(id)); saveAllStorage(); calculateStats(); renderCurrentTab(); }
 function markAsDelayed(){ invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; }); localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices)); renderCurrentTab(); }
+
+// دوال القائمة المخصصة
+function moveToCustom(){
+    selectedIds.forEach(id=>{
+        if(!customIds.includes(id)) customIds.push(id);
+        if(debtIds.includes(id)) debtIds = debtIds.filter(did => did !== id); // إزالة من المديونية إذا نقل للمخصص
+    });
+    saveAllStorage(); calculateStats(); renderCurrentTab();
+}
+function removeFromCustom(){
+    customIds = customIds.filter(id => !selectedIds.has(id));
+    saveAllStorage(); calculateStats(); renderCurrentTab();
+}
+function saveAllStorage(){
+    localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
+    localStorage.setItem(STORAGE.CUSTOM_IDS,JSON.stringify(customIds));
+}
+
 function renderNicks(){ updateCreatorsList(); }
 function updateCreatorsList(){
     const s=document.getElementById("creatorFilter"); const current=s.value;
@@ -391,16 +485,25 @@ function saveToHistory(){
     const creator = document.getElementById("creatorFilter").value;
     if(creator === 'all' && !confirm("حفظ تقرير لكل المناديب؟")) return;
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
-    const activeDebt = invoices.filter(inv => debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const dateStr = new Date().toLocaleString('ar-EG');
+    
+    const activeDebt = invoices.filter(inv => debtIds.includes(inv.id) && !customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
     const activeExp = expenses.filter(e => creator === 'all' || e.creator === creator);
-    const activeDelay = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const activeDelay = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const activeCustom = invoices.filter(inv => customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
 
-    if(!activeDebt.length && !activeExp.length){ alert("لا توجد بيانات للحفظ!"); return; }
+    if(!activeDebt.length && !activeExp.length && !activeCustom.length){ alert("لا توجد بيانات للحفظ!"); return; }
 
-    historyLog.push({ id: Date.now(), saveDate: new Date().toLocaleString('ar-EG'), creatorRaw: creator, creatorName: creatorName, totalDebt: currentStats.debt, totalExp: currentStats.expenses, net: currentStats.net, invoices: activeDebt, expenses: activeExp, delayedInvoices: activeDelay });
+    historyLog.push({ 
+        id: Date.now(), saveDate: dateStr, creatorRaw: creator, creatorName: creatorName, 
+        totalDebt: currentStats.debt, totalExp: currentStats.expenses, net: currentStats.net, 
+        invoices: activeDebt, expenses: activeExp, delayedInvoices: activeDelay, 
+        customInvoices: activeCustom, customName: customTabName
+    });
     localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog));
     alert("تم حفظ المديونية للأرشيف");
 }
+
 function renderHistory(){
     const list = document.getElementById("historyList"); list.innerHTML = "";
     const creator = document.getElementById("creatorFilter").value;
@@ -410,18 +513,26 @@ function renderHistory(){
     });
 }
 function deleteHistoryItem(id){ if(!confirm("حذف؟")) return; historyLog = historyLog.filter(h => h.id !== id); localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog)); renderHistory(); }
-function exportHistoryItem(item){ generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.delayedInvoices, {debt: item.totalDebt, expenses: item.totalExp, net: item.net}, item.saveDate); }
+
+function exportHistoryItem(item){ 
+    generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.delayedInvoices, item.customInvoices, 
+    {debt: item.totalDebt, expenses: item.totalExp, net: item.net}, item.saveDate, item.customName); 
+}
+
 function exportToExcel(isHistory) {
     if(isHistory) return;
     const creator = document.getElementById("creatorFilter").value;
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
-    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    
+    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
-    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
-    generateColoredExcel(creatorName, debtInvoices, filteredExpenses, delayedInvoices, currentStats, new Date().toISOString().split('T')[0]);
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const customInvoicesList = invoices.filter(inv => customIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+
+    generateColoredExcel(creatorName, debtInvoices, filteredExpenses, delayedInvoices, customInvoicesList, currentStats, new Date().toISOString().split('T')[0], customTabName);
 }
 
-async function generateColoredExcel(name, debtInvs, exps, delayedInvs, stats, dateVal){
+async function generateColoredExcel(name, debtInvs, exps, delayedInvs, customInvs, stats, dateVal, custTabName){
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('التقرير المالي', {views: [{rightToLeft: true}]});
     sheet.columns = [{ width: 30 }, { width: 25 }, { width: 15 }, { width: 15 }];
@@ -457,6 +568,23 @@ async function generateColoredExcel(name, debtInvs, exps, delayedInvs, stats, da
     sheet.addRow(['الوصف', 'المندوب', 'التاريخ', 'المبلغ']).font={bold:true};
     exps.forEach(e => sheet.addRow([e.desc, name, e.date, e.amount]));
     sheet.addRow(['المجموع', '', '', stats.expenses]).font={bold:true};
+    sheet.addRow([]);
+
+    // Custom Tab Export (Purple)
+    if(customInvs && customInvs.length > 0) {
+        const custName = custTabName || "قائمة مخصصة";
+        const custTotal = customInvs.reduce((a,b)=>a+b.due,0);
+        const custHeader = sheet.addRow([`${custName} (لا تدخل في الصافي)`]);
+        sheet.mergeCells(`A${custHeader.number}:D${custHeader.number}`);
+        custHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        custHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF8E44AD'} };
+        custHeader.alignment = { horizontal: 'center' };
+        
+        sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']).font={bold:true};
+        customInvs.forEach(i => sheet.addRow([i.ref, i.customer, i.date, i.due]));
+        sheet.addRow(['الإجمالي المخصص', '', '', custTotal]).font={bold:true};
+        sheet.addRow([]);
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `تقرير_${name}.xlsx`);

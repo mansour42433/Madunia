@@ -3,10 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>نظام التقرير الشامل المطور (Excel ملون)</title>
+<title>نظام التقرير الشامل (النسخة الكاملة)</title>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -14,13 +12,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <style>
-/* المتغيرات والألوان */
+/* تنسيقات الصفحة والألوان */
 :root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9; --pending:#8e44ad; --adj:#16a085;}
 body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 120px;}
 .box{background:#fff;padding:25px;border-radius:15px;max-width:1400px;margin:auto;box-shadow: 0 4px 20px rgba(0,0,0,0.05)}
 h2{margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center}
 
-/* البطاقات الإحصائية */
+/* البطاقات العلوية */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:25px}
 .card{padding:20px;border-radius:12px;color:#fff;text-align:center;position: relative; overflow: hidden;}
 .card h3 {margin: 0 0 10px; font-size: 1rem; opacity: 0.9;}
@@ -48,38 +46,33 @@ button.export-all {background: #27ae60; width: 100%; justify-content: center; fo
 table{width:100%;border-collapse:collapse; min-width:1000px;}
 th{background:#f8f9fa;color:var(--d);padding:15px; text-align: right; font-weight: 700;}
 td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
-tr:last-child td {border-bottom: none;}
 
-/* العلامات (Tags) */
+/* العلامات الملونة */
 .tag {padding: 4px 10px; border-radius: 20px; font-size: 0.85em; font-weight: bold;}
 .tag-delayed {background: #e8f6fd; color: var(--p);}
 .tag-cash {background: #eafaf1; color: var(--g);}
 .tag-debt {background: #fdeaea; color: var(--r);}
 .tag-pending {background: #f3e5f5; color: var(--pending);}
 .tag-part {background: #fff3cd; color: #856404;}
-/* ستايلات التسويات */
-.tag-plus {color: #c0392b; background: #fadbd8; font-weight:bold;} /* زيادة مديونية */
-.tag-minus {color: #27ae60; background: #d5f5e3; font-weight:bold;} /* خصم مديونية */
+.tag-plus {color: #c0392b; background: #fadbd8; font-weight:bold;}
+.tag-minus {color: #27ae60; background: #d5f5e3; font-weight:bold;}
 
 /* الشريط العائم */
 .floating-bar {position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--d); color: #fff; padding: 15px 30px; border-radius: 50px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000; transition: 0.4s; opacity: 0;}
 .floating-bar.show {transform: translateX(-50%) translateY(0); opacity: 1;}
 
-/* النماذج (Forms) */
-.expense-form {display: flex; gap: 10px; background: #fff5f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
-.adj-form {display: flex; gap: 10px; background: #e8f8f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
+/* النماذج */
+.expense-form, .adj-form {display: flex; gap: 10px; background: #fff5f5; padding: 15px; border-radius: 8px; align-items: end; margin-bottom: 15px;}
+.adj-form {background: #e8f8f5;}
 .form-group {flex: 1;}
 .form-group label {display: block; font-size: 0.8em; margin-bottom: 5px; color: #555;}
-
-/* تنسيق الأرشيف */
 .history-item {border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd;}
-.history-info strong {display: block; font-size: 1.1em; color: var(--d);}
-.history-info span {color: #777; font-size: 0.9em;}
 </style>
 </head>
 <body>
 <div class="box">
     <h2><span><i class="fas fa-file-invoice-dollar"></i> نظام التقارير والمديونية</span></h2>
+    
     <div class="controls">
         <button onclick="fetchData()" id="upBtn" class="refresh"><i class="fas fa-sync-alt"></i> تحديث البيانات</button>
         <span id="status" style="margin-right: 10px; font-weight: bold; color: var(--p);"></span>
@@ -93,15 +86,13 @@ tr:last-child td {border-bottom: none;}
         <div class="card" style="background:var(--r)"><i class="fas fa-wallet"></i><h3>المديونية (فواتير)</h3><span id="stat-debt" class="card-val">0</span></div>
         <div class="card" style="background:#16a085"><i class="fas fa-sliders-h"></i><h3>صافي التسويات</h3><span id="stat-adj" class="card-val">0</span></div>
         <div class="card" style="background:#c0392b"><i class="fas fa-minus-circle"></i><h3>المصروفات</h3><span id="stat-expense" class="card-val">0</span></div>
-        
         <div class="card" style="background:var(--d)"><i class="fas fa-calculator"></i><h3>الصافي النهائي</h3><span id="stat-net" class="card-val">0</span></div>
-        
         <div class="card" style="background:var(--pending);"><i class="fas fa-exchange-alt"></i><h3>بانتظار التحويل</h3><span id="stat-pending" class="card-val">0</span></div>
         <div class="card" style="background:var(--p); opacity: 0.8;"><i class="fas fa-star"></i><h3>آجل (للمعلومة)</h3><span id="stat-delayed" class="card-val">0</span></div>
     </div>
 
     <div style="display: flex; gap: 10px;">
-        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير (Excel) ملون</button>
+        <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير Excel (ملون + استحقاق)</button>
         <button onclick="saveToHistory()" class="save-archive"><i class="fas fa-save"></i> حفظ المديونية للأرشيف</button>
     </div>
 
@@ -112,9 +103,7 @@ tr:last-child td {border-bottom: none;}
         <button class="tab" id="tab-cash" onclick="switchTab('cash')"><i class="fas fa-wallet"></i> نقدية<span id="badge-cash" class="tab-badge">0</span></button>
         <button class="tab" id="tab-debt" onclick="switchTab('debt')"><i class="fas fa-file-invoice-dollar"></i> المديونية<span id="badge-debt" class="tab-badge">0</span></button>
         <button class="tab" id="tab-pending" onclick="switchTab('pending')" style="color:var(--pending); border-bottom-color:transparent;"><i class="fas fa-exchange-alt"></i> بانتظار التحويل<span id="badge-pending" class="tab-badge">0</span></button>
-        
         <button class="tab" id="tab-adjustments" onclick="switchTab('adjustments')" style="color:var(--adj); border-bottom-color:transparent;"><i class="fas fa-sliders-h"></i> مبالغ مخصصة<span id="badge-adjustments" class="tab-badge">0</span></button>
-        
         <button class="tab" id="tab-expenses" onclick="switchTab('expenses')"><i class="fas fa-gas-pump"></i> المصروفات<span id="badge-expenses" class="tab-badge">0</span></button>
         <button class="tab" id="tab-nicks" onclick="switchTab('nicks')"><i class="fas fa-user-tag"></i> المناديب</button>
         <button class="tab" id="tab-history" onclick="switchTab('history')"><i class="fas fa-history"></i> الأرشيف</button>
@@ -129,6 +118,7 @@ tr:last-child td {border-bottom: none;}
                     <th>العميل</th>
                     <th>المندوب</th>
                     <th>التاريخ</th>
+                    <th style="color:#c0392b">ت. الاستحقاق</th>
                     <th>التصنيف</th>
                     <th>المبلغ المتبقي</th>
                     <th>الحالة</th>
@@ -161,22 +151,14 @@ tr:last-child td {border-bottom: none;}
                 <div class="form-group"><label>المبلغ</label><input id="adjAmount" type="number" placeholder="0"></div>
                 <div class="form-group"><button onclick="addAdjustment()" style="background:var(--adj); width:100%; justify-content:center"><i class="fas fa-plus"></i> حفظ</button></div>
             </div>
-            <p style="font-size:0.9em; color:#777; margin-bottom:15px;">* <b>إضافة على المديونية:</b> يعني أن المندوب عليه فلوس زيادة (مثل نقص بالتحويل). <br> * <b>خصم من المديونية:</b> يعني المندوب له فلوس أو دفع زيادة تنقص من دينه.</p>
             <table style="width:100%">
                 <thead><tr><th>الوصف</th><th>المندوب</th><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>حذف</th></tr></thead>
                 <tbody id="adjRows"></tbody>
             </table>
         </div>
 
-        <div id="nicksDiv" style="display:none; padding:20px;">
-            <h3>تخصيص أسماء المناديب</h3>
-            <div id="nickRows"></div>
-        </div>
-
-        <div id="historyDiv" style="display:none; padding:20px;">
-            <h3 style="color:var(--p)">سجل المديونيات المحفوظة</h3>
-            <div id="historyList"></div>
-        </div>
+        <div id="nicksDiv" style="display:none; padding:20px;"><h3>تخصيص أسماء المناديب</h3><div id="nickRows"></div></div>
+        <div id="historyDiv" style="display:none; padding:20px;"><h3 style="color:var(--p)">سجل المديونيات المحفوظة</h3><div id="historyList"></div></div>
     </div>
 </div>
 
@@ -186,37 +168,27 @@ tr:last-child td {border-bottom: none;}
 </div>
 
 <script>
+// --- إعدادات النظام ---
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
-
-// التخزين المحلي (تحديث النسخ لتجنب التعارض)
-const STORAGE = {
-    INVOICES:"sys_inv_v7", 
-    DEBT_IDS:"sys_debt_v7", 
-    PENDING_IDS:"sys_pending_v7", 
-    EXPENSES:"sys_exp_v7", 
-    ADJUSTMENTS:"sys_adj_v1", 
-    NICKS:"sys_nicks_v7", 
-    HISTORY:"sys_hist_v2"
-};
+const STORAGE = { INVOICES:"sys_inv_v8", DEBT_IDS:"sys_debt_v8", PENDING_IDS:"sys_pending_v8", EXPENSES:"sys_exp_v8", ADJUSTMENTS:"sys_adj_v8", NICKS:"sys_nicks_v8", HISTORY:"sys_hist_v3" };
 
 let invoices=[], debtIds=[], pendingIds=[], expenses=[], adjustments=[], nicknames={}, historyLog=[], selectedIds=new Set(), currentTab='delayed';
 let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, pending: 0, adjNet: 0 };
 
+// --- التشغيل الأولي ---
 function init(){
     invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
     debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");
     pendingIds=JSON.parse(localStorage.getItem(STORAGE.PENDING_IDS)||"[]");
     expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
-    adjustments=JSON.parse(localStorage.getItem(STORAGE.ADJUSTMENTS)||"[]"); 
+    adjustments=JSON.parse(localStorage.getItem(STORAGE.ADJUSTMENTS)||"[]");
     nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
     historyLog=JSON.parse(localStorage.getItem(STORAGE.HISTORY)||"[]");
-    
-    updateCreatorsList();
-    calculateStats(); 
-    renderCurrentTab();
+    updateCreatorsList(); calculateStats(); renderCurrentTab();
 }
 
+// --- جلب البيانات ---
 async function fetchData(){
     const btn=document.getElementById("upBtn"),st=document.getElementById("status");
     btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> جاري الجلب...';
@@ -237,65 +209,38 @@ async function fetchData(){
             if(isNaN(dueAmount)) dueAmount=parseFloat(inv.total);
             
             return {
-                id:inv.id,
-                ref:inv.reference,
-                customer:custMap[inv.contact_id]||inv.contact_name||"عميل عام",
-                creator:inv.created_by,
-                date:inv.issue_date,
-                total:parseFloat(inv.total),
-                due:dueAmount,
-                status:inv.status,
-                is_delayed:isDelayed
+                id:inv.id, ref:inv.reference, customer:custMap[inv.contact_id]||inv.contact_name||"عميل عام",
+                creator:inv.created_by, date:inv.issue_date, 
+                dueDate: inv.due_date || inv.issue_date, // إضافة تاريخ الاستحقاق
+                total:parseFloat(inv.total), due:dueAmount, status:inv.status, is_delayed:isDelayed
             };
         });
         localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
-        updateCreatorsList(); 
-        calculateStats(); 
-        renderCurrentTab();
-        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; 
-        st.innerText="✅ تم"; 
-        setTimeout(()=>st.innerText="",2000);
+        updateCreatorsList(); calculateStats(); renderCurrentTab();
+        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="✅ تم"; setTimeout(()=>st.innerText="",2000);
     }catch(e){
-        console.error(e);
-        btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث';
-        st.innerText="❌ خطأ";
-        alert("فشل جلب البيانات.");
-    }finally{
-        btn.disabled=false;
-    }
+        console.error(e); btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="❌ خطأ"; alert("فشل جلب البيانات.");
+    }finally{ btn.disabled=false; }
 }
 
-function handleFilterChange() {
-    calculateStats(); 
-    renderCurrentTab();
-}
+function handleFilterChange() { calculateStats(); renderCurrentTab(); }
 
+// --- المنطق والفلاتر ---
 function getFilteredInvoices(){
     const creator=document.getElementById("creatorFilter").value;
     const search=document.getElementById("searchInput").value.toLowerCase();
-    
     return invoices.filter(inv=>{
         if(inv.status==="Draft"||inv.status==="Voided"||inv.status==="Paid"||inv.due<=0) return false;
-        
         const creatorMatch=(creator==='all'||inv.creator===creator);
         if(!creatorMatch) return false;
-
         const isPending = pendingIds.includes(inv.id);
         const isDebt = debtIds.includes(inv.id);
-
         let tabMatch=false;
-        if(currentTab==='pending') {
-            tabMatch = isPending; 
-        } else if(currentTab==='debt') {
-            tabMatch = isDebt && !isPending; 
-        } else if(currentTab==='delayed') {
-            tabMatch = inv.is_delayed && !isDebt && !isPending; 
-        } else if(currentTab==='cash') {
-            tabMatch = !inv.is_delayed && !isDebt && !isPending; 
-        }
-        
+        if(currentTab==='pending') tabMatch = isPending; 
+        else if(currentTab==='debt') tabMatch = isDebt && !isPending; 
+        else if(currentTab==='delayed') tabMatch = inv.is_delayed && !isDebt && !isPending; 
+        else if(currentTab==='cash') tabMatch = !inv.is_delayed && !isDebt && !isPending; 
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
-        
         return tabMatch&&searchMatch;
     });
 }
@@ -303,19 +248,11 @@ function getFilteredInvoices(){
 function calculateStats(){
     const creator = document.getElementById("creatorFilter").value;
     const isCreator = (c) => (creator === 'all' || c === creator);
-
-    // المصروفات
     const filteredExpenses = expenses.filter(e => isCreator(e.creator));
     const totalExp = filteredExpenses.reduce((a, b) => a + b.amount, 0);
-
-    // التسويات (المبالغ المخصصة)
     const filteredAdj = adjustments.filter(a => isCreator(a.creator));
-    let adjPlus = 0; // زيادة على المديونية
-    let adjMinus = 0; // خصم من المديونية
-    filteredAdj.forEach(a => {
-        if(a.type === 'plus') adjPlus += a.amount;
-        else adjMinus += a.amount;
-    });
+    let adjPlus = 0, adjMinus = 0;
+    filteredAdj.forEach(a => { if(a.type === 'plus') adjPlus += a.amount; else adjMinus += a.amount; });
     const adjNet = adjPlus - adjMinus; 
 
     const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
@@ -323,22 +260,12 @@ function calculateStats(){
 
     const pendingInvoices = invoices.filter(inv => pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
     const totalPending = pendingInvoices.reduce((a,b) => a + b.due, 0);
-
-    const debtInvoices = invoices.filter(inv => {
-        return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv);
-    });
+    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
     const totalDebt = debtInvoices.reduce((a, b) => a + b.due, 0);
-
-    const delayedInvoices = invoices.filter(inv => {
-        return inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv);
-    });
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
     const totalDelayed = delayedInvoices.reduce((a, b) => a + b.due, 0);
+    const cashInvoices = invoices.filter(inv => !inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
 
-    const cashInvoices = invoices.filter(inv => {
-        return !inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv);
-    });
-
-    // المعادلة النهائية: (مديونية الفواتير) + (صافي التسويات) - (المصروفات)
     const net = totalDebt + adjNet - totalExp;
 
     document.getElementById("stat-delayed").innerText = totalDelayed.toLocaleString();
@@ -346,11 +273,8 @@ function calculateStats(){
     document.getElementById("stat-expense").innerText = totalExp.toLocaleString();
     document.getElementById("stat-net").innerText = net.toLocaleString();
     document.getElementById("stat-pending").innerText = totalPending.toLocaleString();
-    
-    // عرض صافي التسويات
     const adjEl = document.getElementById("stat-adj");
     adjEl.innerText = (adjNet > 0 ? "+" : "") + adjNet.toLocaleString();
-    // لون النص ثابت أبيض لأن الخلفية خضراء
 
     document.getElementById("badge-delayed").innerText = delayedInvoices.length;
     document.getElementById("badge-debt").innerText = debtInvoices.length;
@@ -363,54 +287,29 @@ function calculateStats(){
 }
 
 function renderCurrentTab(){
-    const mainTable = document.getElementById("tbl");
-    const expDiv = document.getElementById("expensesDiv");
-    const adjDiv = document.getElementById("adjustmentsDiv");
-    const nickDiv = document.getElementById("nicksDiv");
-    const histDiv = document.getElementById("historyDiv");
-
-    mainTable.style.display='none';
-    expDiv.style.display='none';
-    adjDiv.style.display='none';
-    nickDiv.style.display='none';
-    histDiv.style.display='none';
-
+    const mainTable=document.getElementById("tbl"), expDiv=document.getElementById("expensesDiv"), adjDiv=document.getElementById("adjustmentsDiv"), nickDiv=document.getElementById("nicksDiv"), histDiv=document.getElementById("historyDiv");
+    mainTable.style.display='none'; expDiv.style.display='none'; adjDiv.style.display='none'; nickDiv.style.display='none'; histDiv.style.display='none';
     if(currentTab==='expenses'){ expDiv.style.display='block'; renderExpenses(); return; }
     if(currentTab==='adjustments'){ adjDiv.style.display='block'; renderAdjustments(); return; }
     if(currentTab==='nicks'){ nickDiv.style.display='block'; renderNicks(); return; }
     if(currentTab==='history'){ histDiv.style.display='block'; renderHistory(); return; }
-
-    mainTable.style.display='table';
-    selectedIds.clear(); 
-    updateFloatingBar(); 
     
+    mainTable.style.display='table'; selectedIds.clear(); updateFloatingBar(); 
     document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
     document.getElementById("tab-"+currentTab)?.classList.add("active");
 
-    const data=getFilteredInvoices(); 
-    const tbody=document.getElementById("rows");
-    tbody.innerHTML="";
-    
-    if(data.length===0){
-        tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:30px;color:#999">لا توجد بيانات للعرض</td></tr>`;
-        return;
-    }
+    const data=getFilteredInvoices(); const tbody=document.getElementById("rows"); tbody.innerHTML="";
+    if(data.length===0){ tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:30px;color:#999">لا توجد بيانات للعرض</td></tr>`; return; }
     
     data.forEach(inv=>{
         const nick=nicknames[inv.creator]||inv.creator;
         let tag=inv.is_delayed?'<span class="tag tag-delayed">آجلة</span>':'<span class="tag tag-cash">كاش</span>';
-        
         if(pendingIds.includes(inv.id)) tag='<span class="tag tag-pending">في الانتظار</span>';
         else if(debtIds.includes(inv.id)) tag='<span class="tag tag-debt">في المديونية</span>';
-        
         let statusHtml='<span style="color:#f39c12">معلقة</span>';
         if(inv.status==='Partially Paid'||inv.due<inv.total) statusHtml='<span class="tag tag-part">مدفوعة جزئياً</span>';
-        
         let amountDisplay=`<span style="font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</span>`;
-        if(inv.due<inv.total){
-            amountDisplay=`<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div>
-                           <div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`;
-        }
+        if(inv.due<inv.total){ amountDisplay=`<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div><div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`; }
         
         tbody.innerHTML+=`<tr onclick="rowClick(event, ${inv.id})">
             <td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td>
@@ -418,6 +317,7 @@ function renderCurrentTab(){
             <td>${inv.customer}</td>
             <td>${nick}</td>
             <td>${inv.date}</td>
+            <td style="color:#c0392b">${inv.dueDate || '-'}</td>
             <td>${tag}</td>
             <td>${amountDisplay}</td>
             <td>${statusHtml}</td>
@@ -427,341 +327,136 @@ function renderCurrentTab(){
 
 function renderExpenses(){
     const creator=document.getElementById("creatorFilter").value;
-    const tbody=document.getElementById("expenseRows");
-    tbody.innerHTML="";
+    const tbody=document.getElementById("expenseRows"); tbody.innerHTML="";
     const filtered = expenses.filter(e=>creator==='all'||e.creator===creator);
-    
-    if(filtered.length === 0) {
-        tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#999">لا توجد مصروفات</td></tr>`;
-        return;
-    }
+    if(filtered.length === 0) { tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#999">لا توجد مصروفات</td></tr>`; return; }
     filtered.forEach(exp=>{
         const nick=nicknames[exp.creator]||exp.creator;
-        tbody.innerHTML+=`<tr>
-            <td>${exp.desc}</td>
-            <td>${nick}</td>
-            <td>${exp.date}</td>
-            <td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td>
-            <td><button onclick="delExpense(${exp.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
+        tbody.innerHTML+=`<tr><td>${exp.desc}</td><td>${nick}</td><td>${exp.date}</td><td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td><td><button onclick="delExpense(${exp.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 }
 
 function renderAdjustments(){
     const creator=document.getElementById("creatorFilter").value;
-    const tbody=document.getElementById("adjRows");
-    tbody.innerHTML="";
+    const tbody=document.getElementById("adjRows"); tbody.innerHTML="";
     const filtered = adjustments.filter(a=>creator==='all'||a.creator===creator);
-    
-    if(filtered.length === 0) {
-        tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:#999">لا توجد مبالغ مخصصة</td></tr>`;
-        return;
-    }
+    if(filtered.length === 0) { tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:#999">لا توجد مبالغ مخصصة</td></tr>`; return; }
     filtered.forEach(adj=>{
         const nick=nicknames[adj.creator]||adj.creator;
-        const typeHtml = adj.type === 'plus' 
-            ? '<span class="tag tag-debt">➕ إضافة على الدين</span>' 
-            : '<span class="tag tag-cash">➖ خصم من الدين</span>';
+        const typeHtml = adj.type === 'plus' ? '<span class="tag tag-debt">➕ إضافة على الدين</span>' : '<span class="tag tag-cash">➖ خصم من الدين</span>';
         const color = adj.type === 'plus' ? '#c0392b' : '#27ae60';
-
-        tbody.innerHTML+=`<tr>
-            <td>${adj.desc}</td>
-            <td>${nick}</td>
-            <td>${adj.date}</td>
-            <td>${typeHtml}</td>
-            <td style="font-weight:bold; color:${color}">${adj.amount.toLocaleString()}</td>
-            <td><button onclick="delAdjustment(${adj.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
+        tbody.innerHTML+=`<tr><td>${adj.desc}</td><td>${nick}</td><td>${adj.date}</td><td>${typeHtml}</td><td style="font-weight:bold; color:${color}">${adj.amount.toLocaleString()}</td><td><button onclick="delAdjustment(${adj.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 }
 
+// --- العمليات (إضافة/حذف) ---
 function addExpense(){
-    const creator=document.getElementById("creatorFilter").value;
-    if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}
-    const desc=document.getElementById("expDesc").value;
-    const amount=parseFloat(document.getElementById("expAmount").value);
-    
+    const creator=document.getElementById("creatorFilter").value; if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}
+    const desc=document.getElementById("expDesc").value, amount=parseFloat(document.getElementById("expAmount").value);
     if(!desc||!amount) return;
-    
     expenses.push({ id:Date.now(), desc, amount, date: new Date().toISOString().split('T')[0], creator });
     localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
-    document.getElementById("expDesc").value="";
-    document.getElementById("expAmount").value="";
-    calculateStats(); renderExpenses();
+    document.getElementById("expDesc").value=""; document.getElementById("expAmount").value=""; calculateStats(); renderExpenses();
 }
 
 function addAdjustment(){
-    const creator=document.getElementById("creatorFilter").value;
-    if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}
-    const desc=document.getElementById("adjDesc").value;
-    const type=document.getElementById("adjType").value;
-    const amount=parseFloat(document.getElementById("adjAmount").value);
-    
+    const creator=document.getElementById("creatorFilter").value; if(creator==='all'){alert("يجب اختيار المندوب أولاً!");return;}
+    const desc=document.getElementById("adjDesc").value, type=document.getElementById("adjType").value, amount=parseFloat(document.getElementById("adjAmount").value);
     if(!desc||!amount) return;
-    
     adjustments.push({ id:Date.now(), desc, type, amount, date: new Date().toISOString().split('T')[0], creator });
     localStorage.setItem(STORAGE.ADJUSTMENTS,JSON.stringify(adjustments));
-    
-    document.getElementById("adjDesc").value="";
-    document.getElementById("adjAmount").value="";
-    calculateStats(); renderAdjustments();
+    document.getElementById("adjDesc").value=""; document.getElementById("adjAmount").value=""; calculateStats(); renderAdjustments();
 }
 
-function delExpense(id){
-    if(!confirm("حذف المصروف؟"))return;
-    expenses=expenses.filter(e=>e.id!==id);
-    localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses));
-    calculateStats(); renderExpenses();
-}
+function delExpense(id){ if(!confirm("حذف المصروف؟"))return; expenses=expenses.filter(e=>e.id!==id); localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses)); calculateStats(); renderExpenses(); }
+function delAdjustment(id){ if(!confirm("حذف هذا المبلغ؟"))return; adjustments=adjustments.filter(a=>a.id!==id); localStorage.setItem(STORAGE.ADJUSTMENTS,JSON.stringify(adjustments)); calculateStats(); renderAdjustments(); }
 
-function delAdjustment(id){
-    if(!confirm("حذف هذا المبلغ؟"))return;
-    adjustments=adjustments.filter(a=>a.id!==id);
-    localStorage.setItem(STORAGE.ADJUSTMENTS,JSON.stringify(adjustments));
-    calculateStats(); renderAdjustments();
-}
-
-function switchTab(tab){
-    currentTab=tab;
-    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-    document.getElementById("tab-"+tab)?.classList.add("active");
-    renderCurrentTab();
-}
-
-function toggleSelect(id){
-    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-    updateFloatingBar();
-}
-function toggleAll(source){
-    const checkboxes=document.querySelectorAll('.row-chk');
-    checkboxes.forEach(c=>{
-        c.checked=source.checked;
-        const id=parseInt(c.value);
-        if(source.checked) selectedIds.add(id); else selectedIds.delete(id);
-    });
-    updateFloatingBar();
-}
-function rowClick(e, id){
-    if(e.target.tagName==='INPUT' || e.target.tagName==='BUTTON') return;
-    const chk=document.querySelector(`input[value="${id}"]`);
-    if(chk) { chk.checked=!chk.checked; toggleSelect(id); }
-}
+function switchTab(tab){ currentTab=tab; document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active")); document.getElementById("tab-"+tab)?.classList.add("active"); renderCurrentTab(); }
+function toggleSelect(id){ if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); updateFloatingBar(); }
+function toggleAll(source){ const checkboxes=document.querySelectorAll('.row-chk'); checkboxes.forEach(c=>{ c.checked=source.checked; const id=parseInt(c.value); if(source.checked) selectedIds.add(id); else selectedIds.delete(id); }); updateFloatingBar(); }
+function rowClick(e, id){ if(e.target.tagName==='INPUT' || e.target.tagName==='BUTTON') return; const chk=document.querySelector(`input[value="${id}"]`); if(chk) { chk.checked=!chk.checked; toggleSelect(id); } }
 
 function updateFloatingBar(){
-    const bar=document.getElementById("floatBar");
-    document.getElementById("selCount").innerText=selectedIds.size;
+    const bar=document.getElementById("floatBar"); document.getElementById("selCount").innerText=selectedIds.size;
     if(selectedIds.size>0){
-        bar.classList.add("show");
-        const actionsDiv=document.getElementById("actionButtons");
-        let buttonsHTML = "";
-        
-        if(currentTab === 'pending') {
-             buttonsHTML+=`<button onclick="removeFromPending()" style="background:#f39c12">إعادة للفواتير الأصلية</button>`;
-        } else {
-             if(currentTab==='delayed'){
-                  buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
-             } else if(currentTab==='debt'){
-                  buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
-             } else if(currentTab==='cash'){
-                  buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button>`;
-                  buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
-             }
+        bar.classList.add("show"); const actionsDiv=document.getElementById("actionButtons"); let buttonsHTML = "";
+        if(currentTab === 'pending') buttonsHTML+=`<button onclick="removeFromPending()" style="background:#f39c12">إعادة للفواتير الأصلية</button>`;
+        else {
+             if(currentTab==='delayed') buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`;
+             else if(currentTab==='debt') buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
+             else if(currentTab==='cash') { buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button>`; buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`; }
              buttonsHTML+=`<button onclick="moveToPending()" style="background:var(--pending); margin-right:10px;">نقل للانتظار</button>`;
         }
-        
         actionsDiv.innerHTML = buttonsHTML;
-    } else {
-        bar.classList.remove("show");
-    }
+    } else bar.classList.remove("show");
 }
 
-function moveToPending(){
-    selectedIds.forEach(id=>{ 
-        if(!pendingIds.includes(id)) pendingIds.push(id); 
-    });
-    localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds));
-    calculateStats(); renderCurrentTab();
-}
-
-function removeFromPending(){
-    pendingIds = pendingIds.filter(id => !selectedIds.has(id));
-    localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds));
-    calculateStats(); renderCurrentTab();
-}
-
-function moveToDebt(){
-    selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); });
-    localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
-    calculateStats(); renderCurrentTab();
-}
-function removeFromDebt(){
-    debtIds=debtIds.filter(id=>!selectedIds.has(id));
-    localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds));
-    calculateStats(); renderCurrentTab();
-}
-function markAsDelayed(){
-    invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; });
-    localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
-    renderCurrentTab();
-}
+function moveToPending(){ selectedIds.forEach(id=>{ if(!pendingIds.includes(id)) pendingIds.push(id); }); localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds)); calculateStats(); renderCurrentTab(); }
+function removeFromPending(){ pendingIds = pendingIds.filter(id => !selectedIds.has(id)); localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds)); calculateStats(); renderCurrentTab(); }
+function moveToDebt(){ selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); }); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
+function removeFromDebt(){ debtIds=debtIds.filter(id=>!selectedIds.has(id)); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
+function markAsDelayed(){ invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; }); localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices)); renderCurrentTab(); }
 
 function renderNicks(){ updateCreatorsList(); }
 function updateCreatorsList(){
-    const s=document.getElementById("creatorFilter");
-    const current=s.value;
-    const allCreators = new Set();
-    invoices.forEach(i => allCreators.add(i.creator));
-    expenses.forEach(e => allCreators.add(e.creator));
-    adjustments.forEach(a => allCreators.add(a.creator)); 
-    const creators=[...allCreators].filter(Boolean);
-    s.innerHTML='<option value="all">كل المناديب</option>';
-    creators.forEach(c=>{
-        const n=nicknames[c]||c;
-        s.innerHTML+=`<option value="${c}">${n}</option>`;
-    });
+    const s=document.getElementById("creatorFilter"), current=s.value;
+    const allCreators = new Set(); invoices.forEach(i => allCreators.add(i.creator)); expenses.forEach(e => allCreators.add(e.creator)); adjustments.forEach(a => allCreators.add(a.creator));
+    const creators=[...allCreators].filter(Boolean); s.innerHTML='<option value="all">كل المناديب</option>';
+    creators.forEach(c=>{ const n=nicknames[c]||c; s.innerHTML+=`<option value="${c}">${n}</option>`; });
     s.value=current;
-    
     const nickRows=document.getElementById("nickRows");
     if(nickRows && currentTab === 'nicks'){
-        nickRows.innerHTML="";
-        creators.forEach(c=>{
-            const val=nicknames[c]||"";
-            nickRows.innerHTML+=`<div style="margin-bottom:10px; display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:5px;">
-                <span style="width:200px; font-weight:bold;">${c}</span>
-                <input type="text" placeholder="الاسم المختصر" value="${val}" onchange="saveNick('${c}', this.value)" style="flex:1">
-            </div>`;
-        });
+        nickRows.innerHTML=""; creators.forEach(c=>{ const val=nicknames[c]||""; nickRows.innerHTML+=`<div style="margin-bottom:10px; display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:5px;"><span style="width:200px; font-weight:bold;">${c}</span><input type="text" placeholder="الاسم المختصر" value="${val}" onchange="saveNick('${c}', this.value)" style="flex:1"></div>`; });
     }
 }
-function saveNick(creator, val){
-    if(val) nicknames[creator]=val; else delete nicknames[creator];
-    localStorage.setItem(STORAGE.NICKS,JSON.stringify(nicknames));
-    updateCreatorsList();
-}
+function saveNick(creator, val){ if(val) nicknames[creator]=val; else delete nicknames[creator]; localStorage.setItem(STORAGE.NICKS,JSON.stringify(nicknames)); updateCreatorsList(); }
 
-// ============================================
-// نظام الأرشيف
-// ============================================
+// --- الأرشيف ---
 function saveToHistory(){
     const creator = document.getElementById("creatorFilter").value;
     if(creator === 'all' && !confirm("تنبيه: أنت تحفظ تقرير لكل المناديب!")) return;
-    
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toLocaleString('ar-EG');
-    
-    const activeDebtInvoices = invoices.filter(inv => {
-        return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
-    });
-
+    const activeDebtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
     const activeExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     const activeAdjustments = adjustments.filter(a => creator === 'all' || a.creator === creator);
+    const activeDelayed = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const activePending = invoices.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
 
-    const activeDelayed = invoices.filter(inv => {
-        return inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
-    });
+    if(activeDebtInvoices.length === 0 && activeExpenses.length === 0 && activeAdjustments.length === 0 && activePending.length === 0){ alert("لا توجد بيانات لحفظها!"); return; }
 
-    const activePending = invoices.filter(inv => {
-        return pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
-    });
-
-    if(activeDebtInvoices.length === 0 && activeExpenses.length === 0 && activeAdjustments.length === 0 && activePending.length === 0){
-        alert("لا توجد بيانات لحفظها!");
-        return;
-    }
-
-    const reportSnapshot = {
-        id: Date.now(),
-        saveDate: dateStr,
-        creatorRaw: creator,
-        creatorName: creatorName,
-        totalDebt: currentStats.debt,
-        totalExp: currentStats.expenses,
-        net: currentStats.net,
-        totalPending: currentStats.pending,
-        adjNet: currentStats.adjNet, 
-        invoices: activeDebtInvoices,
-        expenses: activeExpenses,
-        adjustments: activeAdjustments, 
-        delayedInvoices: activeDelayed,
-        pendingInvoices: activePending
-    };
-
-    historyLog.push(reportSnapshot);
-    localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog));
-    alert("تم الأرشفة بنجاح");
+    const reportSnapshot = { id: Date.now(), saveDate: dateStr, creatorRaw: creator, creatorName: creatorName, totalDebt: currentStats.debt, totalExp: currentStats.expenses, net: currentStats.net, totalPending: currentStats.pending, adjNet: currentStats.adjNet, invoices: activeDebtInvoices, expenses: activeExpenses, adjustments: activeAdjustments, delayedInvoices: activeDelayed, pendingInvoices: activePending };
+    historyLog.push(reportSnapshot); localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog)); alert("تم الأرشفة بنجاح");
 }
 
 function renderHistory(){
-    const list = document.getElementById("historyList");
-    list.innerHTML = "";
+    const list = document.getElementById("historyList"); list.innerHTML = "";
     const creator = document.getElementById("creatorFilter").value;
     const filteredHistory = historyLog.filter(h => creator === 'all' || h.creatorRaw === creator).reverse();
-
-    if(filteredHistory.length === 0){
-        list.innerHTML = "<p>لا يوجد أرشيف محفوظ لهذا الاختيار.</p>";
-        return;
-    }
-
+    if(filteredHistory.length === 0){ list.innerHTML = "<p>لا يوجد أرشيف محفوظ لهذا الاختيار.</p>"; return; }
     filteredHistory.forEach(item => {
-        list.innerHTML += `
-        <div class="history-item">
-            <div class="history-info">
-                <strong><i class="fas fa-file-invoice"></i> تقرير: ${item.creatorName}</strong>
-                <span><i class="far fa-clock"></i> ${item.saveDate}</span> | 
-                <span style="color:var(--d); font-weight:bold">الصافي: ${item.net.toLocaleString()}</span>
-                ${item.adjNet !== 0 ? `| <span style="color:#16a085">تسويات: ${item.adjNet.toLocaleString()}</span>` : ''}
-            </div>
-            <div style="display:flex; gap:5px;">
-                <button onclick='exportHistoryItem(${JSON.stringify(item)})' style="background:#27ae60; font-size:0.8em"><i class="fas fa-download"></i> اكسل</button>
-                <button onclick="deleteHistoryItem(${item.id})" style="background:#c0392b; font-size:0.8em"><i class="fas fa-trash"></i></button>
-            </div>
-        </div>`;
+        list.innerHTML += `<div class="history-item"><div class="history-info"><strong><i class="fas fa-file-invoice"></i> تقرير: ${item.creatorName}</strong><span><i class="far fa-clock"></i> ${item.saveDate}</span> | <span style="color:var(--d); font-weight:bold">الصافي: ${item.net.toLocaleString()}</span>${item.adjNet !== 0 ? `| <span style="color:#16a085">تسويات: ${item.adjNet.toLocaleString()}</span>` : ''}</div><div style="display:flex; gap:5px;"><button onclick='exportHistoryItem(${JSON.stringify(item)})' style="background:#27ae60; font-size:0.8em"><i class="fas fa-download"></i> اكسل</button><button onclick="deleteHistoryItem(${item.id})" style="background:#c0392b; font-size:0.8em"><i class="fas fa-trash"></i></button></div></div>`;
     });
 }
-
-function deleteHistoryItem(id){
-    if(!confirm("حذف هذا السجل؟")) return;
-    historyLog = historyLog.filter(h => h.id !== id);
-    localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog));
-    renderHistory();
-}
-
-function exportHistoryItem(item){
-    generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.adjustments || [], item.delayedInvoices, item.pendingInvoices || [], 
-                 {debt: item.totalDebt, expenses: item.totalExp, net: item.net, pending: item.totalPending || 0, adjNet: item.adjNet || 0}, item.saveDate);
-}
-
-// ============================================
-// تصدير Excel (ExcelJS)
-// ============================================
+function deleteHistoryItem(id){ if(!confirm("حذف هذا السجل؟")) return; historyLog = historyLog.filter(h => h.id !== id); localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog)); renderHistory(); }
+function exportHistoryItem(item){ generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.adjustments || [], item.delayedInvoices, item.pendingInvoices || [], {debt: item.totalDebt, expenses: item.totalExp, net: item.net, pending: item.totalPending || 0, adjNet: item.adjNet || 0}, item.saveDate); }
 
 function exportToExcel(isHistory = false) {
     if(isHistory) return; 
-
     const creator = document.getElementById("creatorFilter").value;
     const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
     const dateStr = new Date().toISOString().split('T')[0];
 
-    const debtInvoices = invoices.filter(inv => {
-        return debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
-    });
-
+    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
-    
-    // فلترة التسويات للتصدير
     const filteredAdjustments = adjustments.filter(a => creator === 'all' || a.creator === creator);
-
-    const delayedInvoices = invoices.filter(inv => {
-        return inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid';
-    });
-    
-    const pendingInvoicesExport = invoices.filter(inv => {
-        return pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0;
-    });
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
+    const pendingInvoicesExport = invoices.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
 
     generateColoredExcel(creatorName, debtInvoices, filteredExpenses, filteredAdjustments, delayedInvoices, pendingInvoicesExport, currentStats, dateStr);
 }
 
+// --- تصدير Excel (المطور) ---
 async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pendingInvs, stats, dateVal){
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('التقرير المالي', {views: [{rightToLeft: true}]});
@@ -769,137 +464,115 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     sheet.columns = [
         { header: 'البيان', key: 'col1', width: 30 },
         { header: 'التفاصيل', key: 'col2', width: 25 },
-        { header: 'التاريخ', key: 'col3', width: 15 },
-        { header: 'المبلغ', key: 'col4', width: 15 }
+        { header: 'تاريخ الفاتورة', key: 'col3', width: 15 },
+        { header: 'ت. الاستحقاق', key: 'col4', width: 15 },
+        { header: 'المبلغ', key: 'col5', width: 15 }
     ];
 
-    // --- العنوان ---
+    const applyHeaderStyle = (row, colorHex) => {
+        row.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: colorHex} };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { horizontal: 'center' };
+        });
+    };
+
+    // 1. الترويسة
     sheet.addRow(['التقرير المالي الشامل']);
-    sheet.mergeCells('A1:D1');
+    sheet.mergeCells('A1:E1');
     const titleRow = sheet.getRow(1);
+    applyHeaderStyle(titleRow, 'FF2C3E50');
     titleRow.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleRow.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF2C3E50'} };
-    titleRow.alignment = { horizontal: 'center' };
 
     sheet.addRow(['المندوب:', name, 'التاريخ:', dateVal]);
     sheet.getRow(2).font = { bold: true };
     sheet.addRow([]);
 
-    // --- الملخص ---
-    const summaryHeader = sheet.addRow(['ملخص الحسابات']);
-    summaryHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    summaryHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF2980B9'} }; 
-    
-    sheet.addRow(['إجمالي فواتير المديونية', '', '', stats.debt]);
+    // 2. الملخص
+    const summaryRow = sheet.addRow(['ملخص الحسابات']);
+    sheet.mergeCells(`A${summaryRow.number}:E${summaryRow.number}`);
+    applyHeaderStyle(summaryRow, 'FF2980B9');
+
+    sheet.addRow(['إجمالي فواتير المديونية', '', '', '', stats.debt]);
     if(stats.adjNet !== 0) {
-        const row = sheet.addRow(['صافي التسويات (زيادة/نقص)', '', '', stats.adjNet]);
-        if(stats.adjNet > 0) row.getCell(4).font = {color: {argb: 'FFC0392B'}}; // أحمر للزيادة
-        else row.getCell(4).font = {color: {argb: 'FF27AE60'}}; // أخضر للخصم
+        const row = sheet.addRow(['صافي التسويات (زيادة/نقص)', '', '', '', stats.adjNet]);
+        const color = stats.adjNet > 0 ? 'FFC0392B' : 'FF27AE60';
+        row.getCell(5).font = { bold: true, color: { argb: color } };
     }
-    sheet.addRow(['إجمالي المصروفات', '', '', stats.expenses]);
-    
-    const netRow = sheet.addRow(['الصافي المستحق النهائي', '', '', stats.net]);
+    sheet.addRow(['إجمالي المصروفات', '', '', '', stats.expenses]);
+    const netRow = sheet.addRow(['الصافي المستحق النهائي', '', '', '', stats.net]);
     netRow.font = { bold: true, size: 12 };
-    netRow.getCell(4).font = { bold: true, color: { argb: 'FF0000FF' } };
+    netRow.getCell(5).font = { bold: true, color: { argb: 'FF0000FF' }, size: 14 };
     sheet.addRow([]);
 
-    // --- المديونية ---
+    // 3. المديونية
     const debtHeader = sheet.addRow(['تفاصيل فواتير المديونية']);
-    sheet.mergeCells(`A${debtHeader.number}:D${debtHeader.number}`);
-    debtHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    debtHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFE74C3C'} }; 
-    debtHeader.alignment = { horizontal: 'center' };
-
-    const debtCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ المستحق']);
+    sheet.mergeCells(`A${debtHeader.number}:E${debtHeader.number}`);
+    applyHeaderStyle(debtHeader, 'FFE74C3C');
+    const debtCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
     debtCols.font = { bold: true };
-    debtCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
-
-    debtInvs.forEach(inv => {
-        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
-    });
-    const debtTotalRow = sheet.addRow(['المجموع', '', '', stats.debt]);
+    debtCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
+    debtInvs.forEach(inv => { sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); });
+    const debtTotalRow = sheet.addRow(['المجموع', '', '', '', stats.debt]);
     debtTotalRow.font = { bold: true };
     sheet.addRow([]);
 
-    // --- التسويات (المبالغ المخصصة) ---
+    // 4. التسويات
     if(adjs && adjs.length > 0){
         const adjHeader = sheet.addRow(['المبالغ المخصصة (التسويات)']);
-        sheet.mergeCells(`A${adjHeader.number}:D${adjHeader.number}`);
-        adjHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        adjHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF16A085'} }; 
-        adjHeader.alignment = { horizontal: 'center' };
-
-        const adjCols = sheet.addRow(['الوصف', 'النوع', 'التاريخ', 'المبلغ']);
+        sheet.mergeCells(`A${adjHeader.number}:E${adjHeader.number}`);
+        applyHeaderStyle(adjHeader, 'FF16A085');
+        const adjCols = sheet.addRow(['الوصف', 'النوع', 'التاريخ', '', 'المبلغ']);
         adjCols.font = { bold: true };
-        adjCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
-
+        adjCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
         adjs.forEach(a => {
             const typeText = a.type === 'plus' ? 'إضافة (+)' : 'خصم (-)';
-            const row = sheet.addRow([a.desc, typeText, a.date, a.amount]);
-            if(a.type === 'plus') row.getCell(4).font = {color:{argb:'FFC0392B'}};
-            else row.getCell(4).font = {color:{argb:'FF27AE60'}};
+            const row = sheet.addRow([a.desc, typeText, a.date, '', a.amount]);
+            const color = a.type === 'plus' ? 'FFC0392B' : 'FF27AE60';
+            row.getCell(5).font = { bold: true, color: { argb: color } };
         });
-        const adjTotalRow = sheet.addRow(['صافي التسويات', '', '', stats.adjNet]);
+        const adjTotalRow = sheet.addRow(['صافي التسويات', '', '', '', stats.adjNet]);
         adjTotalRow.font = { bold: true };
         sheet.addRow([]);
     }
 
-    // --- المصروفات ---
+    // 5. المصروفات
     const expHeader = sheet.addRow(['تفاصيل المصروفات']);
-    sheet.mergeCells(`A${expHeader.number}:D${expHeader.number}`);
-    expHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    expHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFC0392B'} }; 
-    expHeader.alignment = { horizontal: 'center' };
-
-    const expCols = sheet.addRow(['الوصف', 'المندوب', 'التاريخ', 'المبلغ']);
+    sheet.mergeCells(`A${expHeader.number}:E${expHeader.number}`);
+    applyHeaderStyle(expHeader, 'FFC0392B');
+    const expCols = sheet.addRow(['الوصف', 'المندوب', 'التاريخ', '', 'المبلغ']);
     expCols.font = { bold: true };
-    expCols.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} };
-
-    exps.forEach(exp => {
-        sheet.addRow([exp.desc, name, exp.date, exp.amount]);
-    });
-    const expTotalRow = sheet.addRow(['المجموع', '', '', stats.expenses]);
+    expCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
+    exps.forEach(exp => { sheet.addRow([exp.desc, name, exp.date, '', exp.amount]); });
+    const expTotalRow = sheet.addRow(['المجموع', '', '', '', stats.expenses]);
     expTotalRow.font = { bold: true };
     sheet.addRow([]);
 
-    // --- جدول الانتظار المنفصل ---
+    // 6. الانتظار
     if(pendingInvs && pendingInvs.length > 0){
         sheet.addRow([]);
         const pendingHeader = sheet.addRow(['فواتير بانتظار التحويل (منفصلة)']);
-        sheet.mergeCells(`A${pendingHeader.number}:D${pendingHeader.number}`);
-        pendingHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        pendingHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF8E44AD'} };
-        pendingHeader.alignment = { horizontal: 'center' };
-
-        const pendingCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']);
+        sheet.mergeCells(`A${pendingHeader.number}:E${pendingHeader.number}`);
+        applyHeaderStyle(pendingHeader, 'FF8E44AD');
+        const pendingCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
         pendingCols.font = { bold: true };
-
-        pendingInvs.forEach(inv => {
-            sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
-        });
-        const pendingTotalRow = sheet.addRow(['إجمالي الانتظار', '', '', stats.pending]);
+        pendingInvs.forEach(inv => { sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); });
+        const pendingTotalRow = sheet.addRow(['إجمالي الانتظار', '', '', '', stats.pending]);
         pendingTotalRow.font = { bold: true };
         sheet.addRow([]);
     }
 
-    // --- الآجل ---
+    // 7. الآجل
     const totalDelayed = delayedInvs.reduce((a,b)=>a+b.due,0);
     const delayHeader = sheet.addRow(['الفواتير الآجلة المتبقية (للعلم فقط)']);
-    sheet.mergeCells(`A${delayHeader.number}:D${delayHeader.number}`);
-    delayHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    delayHeader.fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF27AE60'} }; 
-    delayHeader.alignment = { horizontal: 'center' };
-
-    const delayCols = sheet.addRow(['المرجع', 'العميل', 'التاريخ', 'المبلغ']);
+    sheet.mergeCells(`A${delayHeader.number}:E${delayHeader.number}`);
+    applyHeaderStyle(delayHeader, 'FF27AE60');
+    const delayCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
     delayCols.font = { bold: true };
-
-    delayedInvs.forEach(inv => {
-        sheet.addRow([inv.ref, inv.customer, inv.date, inv.due]);
-    });
-    const delayTotalRow = sheet.addRow(['إجمالي الآجل', '', '', totalDelayed]);
+    delayedInvs.forEach(inv => { sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); });
+    const delayTotalRow = sheet.addRow(['إجمالي الآجل', '', '', '', totalDelayed]);
     delayTotalRow.font = { bold: true };
 
-    // --- الحفظ والتنزيل ---
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, `تقرير_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);

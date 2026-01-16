@@ -404,7 +404,11 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
 
     sheet.addRow(['التقرير المالي الشامل']); sheet.mergeCells('A1:E1');
     const titleRow = sheet.getRow(1); applyHeaderStyle(titleRow, 'FF2C3E50'); titleRow.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    sheet.addRow(['المندوب:', name, 'التاريخ:', dateVal]); sheet.getRow(2).font = { bold: true }; sheet.addRow([]);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    sheet.addRow(['المندوب:', name, 'التاريخ:', dateVal, 'الوقت:', timeStr]); 
+    sheet.getRow(2).font = { bold: true }; 
+    sheet.addRow([]);
 
     const summaryRow = sheet.addRow(['ملخص الحسابات']); sheet.mergeCells(`A${summaryRow.number}:E${summaryRow.number}`); applyHeaderStyle(summaryRow, 'FF2980B9');
     sheet.addRow(['إجمالي فواتير المديونية', '', '', '', stats.debt]);
@@ -461,7 +465,9 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `التقرير_المالي_${name}_${dateVal}.xlsx`);
+    const nowTime = new Date();
+    const fileNameTime = nowTime.getHours() + "-" + nowTime.getMinutes() + "-" + nowTime.getSeconds();
+    saveAs(new Blob([buffer]), `التقرير_المالي_${name}_${dateVal}_${fileNameTime}.xlsx`);
 }
 
 init();

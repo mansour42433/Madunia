@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <style>
-/* التنسيقات (لم تتغير) */
+/* التنسيقات */
 :root{--p:#2980b9;--d:#2c3e50;--r:#c0392b;--g:#27ae60;--o:#f39c12;--bg:#f4f6f9; --pending:#8e44ad; --adj:#16a085;}
 body{font-family:'Cairo', sans-serif; background:var(--bg); padding:20px; color: var(--d); padding-bottom: 120px;}
 .box{background:#fff;padding:25px;border-radius:15px;max-width:1400px;margin:auto;box-shadow: 0 4px 20px rgba(0,0,0,0.05)}
@@ -126,20 +126,32 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
 // --- إعدادات النظام ---
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
-const STORAGE = { INVOICES:"sys_inv_v8", DEBT_IDS:"sys_debt_v8", PENDING_IDS:"sys_pending_v8", EXPENSES:"sys_exp_v8", ADJUSTMENTS:"sys_adj_v8", NICKS:"sys_nicks_v8", HISTORY:"sys_hist_v3" };
+const STORAGE = { 
+    INVOICES:"sys_inv_v8", 
+    DEBT_IDS:"sys_debt_v8", 
+    PENDING_IDS:"sys_pending_v8", 
+    EXPENSES:"sys_exp_v8", 
+    ADJUSTMENTS:"sys_adj_v8", 
+    NICKS:"sys_nicks_v8", 
+    HISTORY:"sys_hist_v3",
+    CUSTOMERS: "sys_cust_v1" 
+};
 
-let invoices=[], debtIds=[], pendingIds=[], expenses=[], adjustments=[], nicknames={}, historyLog=[], selectedIds=new Set(), currentTab='delayed';
+let invoices=[], debtIds=[], pendingIds=[], expenses=[], adjustments=[], nicknames={}, historyLog=[], customers={}, selectedIds=new Set(), currentTab='delayed';
 let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, pending: 0, adjNet: 0 };
 
 // --- التشغيل الأولي ---
 function init(){
-    invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
-    debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");
-    pendingIds=JSON.parse(localStorage.getItem(STORAGE.PENDING_IDS)||"[]");
-    expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
-    adjustments=JSON.parse(localStorage.getItem(STORAGE.ADJUSTMENTS)||"[]");
-    nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
-    historyLog=JSON.parse(localStorage.getItem(STORAGE.HISTORY)||"[]");
+    try {
+        invoices=JSON.parse(localStorage.getItem(STORAGE.INVOICES)||"[]");
+        debtIds=JSON.parse(localStorage.getItem(STORAGE.DEBT_IDS)||"[]");
+        pendingIds=JSON.parse(localStorage.getItem(STORAGE.PENDING_IDS)||"[]");
+        expenses=JSON.parse(localStorage.getItem(STORAGE.EXPENSES)||"[]");
+        adjustments=JSON.parse(localStorage.getItem(STORAGE.ADJUSTMENTS)||"[]");
+        nicknames=JSON.parse(localStorage.getItem(STORAGE.NICKS)||"{}");
+        historyLog=JSON.parse(localStorage.getItem(STORAGE.HISTORY)||"[]");
+        customers=JSON.parse(localStorage.getItem(STORAGE.CUSTOMERS)||"{}");
+    } catch(e) { console.error("Storage load error", e); }
     updateCreatorsList(); calculateStats(); renderCurrentTab();
 }
 
@@ -148,11 +160,16 @@ async function fetchData(){
     btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> جاري الجلب...';
     try{
         const r=await fetch(API_URL);
-        if(!r.ok) throw new Error("Server Error");
         const d=await r.json();
+        if(!r.ok) throw new Error(d.error || "Server Error");
+        
         const targetId=d.target_product?.id;
-        const custMap={}; 
-        if(d.customers?.customers) d.customers.customers.forEach(c=>custMap[c.id]=c.name);
+        
+        // تحديث مخزن العملاء محلياً
+        if(d.customers?.customers) {
+            d.customers.customers.forEach(c => { customers[c.id] = c.name; });
+            localStorage.setItem(STORAGE.CUSTOMERS, JSON.stringify(customers));
+        }
         
         invoices=(d.invoices?.invoices||[]).map(inv=>{
             let isDelayed=false;
@@ -160,7 +177,7 @@ async function fetchData(){
             else if(inv.line_items) isDelayed=inv.line_items.some(i=>i.sku===TARGET_SKU_FALLBACK||i.product_name?.includes("آجلة"));
             let dueAmount=parseFloat(inv.due_amount); if(isNaN(dueAmount)) dueAmount=parseFloat(inv.total);
             return {
-                id:inv.id, ref:inv.reference, customer:custMap[inv.contact_id]||inv.contact_name||"عميل عام",
+                id:inv.id, ref:inv.reference, customer:customers[inv.contact_id]||inv.contact_name||"عميل عام",
                 creator:inv.created_by, date:inv.issue_date, dueDate: inv.due_date || inv.issue_date,
                 total:parseFloat(inv.total), due:dueAmount, status:inv.status, is_delayed:isDelayed
             };
@@ -169,7 +186,7 @@ async function fetchData(){
         updateCreatorsList(); calculateStats(); renderCurrentTab();
         btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="✅ تم"; setTimeout(()=>st.innerText="",2000);
     }catch(e){
-        console.error(e); btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="❌ خطأ"; alert("فشل جلب البيانات.");
+        console.error(e); btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="❌ خطأ"; alert("فشل جلب البيانات: " + e.message);
     }finally{ btn.disabled=false; }
 }
 
@@ -292,8 +309,8 @@ function addAdjustment(){
     document.getElementById("adjDesc").value=""; document.getElementById("adjAmount").value=""; calculateStats(); renderAdjustments();
 }
 function delExpense(id){ if(!confirm("حذف المصروف؟"))return; expenses=expenses.filter(e=>e.id!==id); localStorage.setItem(STORAGE.EXPENSES,JSON.stringify(expenses)); calculateStats(); renderExpenses(); }
-function delAdjustment(id){ if(!confirm("حذف هذا المبلغ؟"))return; adjustments=adjustments.filter(a=>a.id!==id); localStorage.setItem(STORAGE.ADJUSTMENTS,JSON.stringify(adjustments)); calculateStats(); renderAdjustments(); }
-function switchTab(tab){ currentTab=tab; document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active")); document.getElementById("tab-"+tab)?.classList.add("active"); renderCurrentTab(); }
+function delAdjustment(id){ if(!confirm("حذف التسوية؟"))return; adjustments=adjustments.filter(a=>a.id!==id); localStorage.setItem(STORAGE.ADJUSTMENTS,JSON.stringify(adjustments)); calculateStats(); renderAdjustments(); }
+function switchTab(tab){ currentTab=tab; renderCurrentTab(); }
 function toggleSelect(id){ if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id); updateFloatingBar(); }
 function toggleAll(source){ const checkboxes=document.querySelectorAll('.row-chk'); checkboxes.forEach(c=>{ c.checked=source.checked; const id=parseInt(c.value); if(source.checked) selectedIds.add(id); else selectedIds.delete(id); }); updateFloatingBar(); }
 function rowClick(e, id){ if(e.target.tagName==='INPUT' || e.target.tagName==='BUTTON') return; const chk=document.querySelector(`input[value="${id}"]`); if(chk) { chk.checked=!chk.checked; toggleSelect(id); } }
@@ -365,7 +382,6 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
         { header: 'البيان', key: 'col1', width: 30 }, { header: 'التفاصيل', key: 'col2', width: 25 }, { header: 'تاريخ الفاتورة', key: 'col3', width: 15 }, { header: 'ت. الاستحقاق', key: 'col4', width: 15 }, { header: 'المبلغ', key: 'col5', width: 15 }
     ];
 
-    // Helper functions for Styling
     const applyHeaderStyle = (row, colorHex) => {
         row.eachCell((cell) => {
             cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: colorHex} };
@@ -375,14 +391,14 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     };
     const applyDataRowStyle = (row, tintColor) => {
         row.eachCell((cell) => {
-            cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: tintColor} }; // Very light tint
-            cell.border = { top: {style:'thin', color: {argb:'FFE0E0E0'}}, bottom: {style:'thin', color: {argb:'FFE0E0E0'}} }; // Thin border
+            cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: tintColor} };
+            cell.border = { top: {style:'thin', color: {argb:'FFE0E0E0'}}, bottom: {style:'thin', color: {argb:'FFE0E0E0'}} };
         });
     };
     const applyTotalRowStyle = (row) => {
         row.font = { bold: true };
         row.eachCell((cell) => {
-            cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: 'FFE0E0E0'} }; // Distinct Gray
+            cell.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: 'FFE0E0E0'} };
         });
     };
 
@@ -390,7 +406,6 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     const titleRow = sheet.getRow(1); applyHeaderStyle(titleRow, 'FF2C3E50'); titleRow.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     sheet.addRow(['المندوب:', name, 'التاريخ:', dateVal]); sheet.getRow(2).font = { bold: true }; sheet.addRow([]);
 
-    // --- ملخص ---
     const summaryRow = sheet.addRow(['ملخص الحسابات']); sheet.mergeCells(`A${summaryRow.number}:E${summaryRow.number}`); applyHeaderStyle(summaryRow, 'FF2980B9');
     sheet.addRow(['إجمالي فواتير المديونية', '', '', '', stats.debt]);
     if(stats.adjNet !== 0) {
@@ -401,17 +416,15 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     const netRow = sheet.addRow(['الصافي المستحق النهائي', '', '', '', stats.net]);
     applyTotalRowStyle(netRow); netRow.getCell(5).font = { bold: true, color: { argb: 'FF0000FF' }, size: 14 }; sheet.addRow([]);
 
-    // --- المديونية (لون فاتح: FFF9EBEA) ---
     const debtHeader = sheet.addRow(['تفاصيل فواتير المديونية']); sheet.mergeCells(`A${debtHeader.number}:E${debtHeader.number}`); applyHeaderStyle(debtHeader, 'FFE74C3C');
     const debtCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
     debtCols.font = { bold: true }; debtCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
     debtInvs.forEach(inv => { 
         const r = sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); 
-        applyDataRowStyle(r, 'FFFDF2F2'); // Very pale red tint
+        applyDataRowStyle(r, 'FFFDF2F2');
     });
     const debtTotalRow = sheet.addRow(['المجموع', '', '', '', stats.debt]); applyTotalRowStyle(debtTotalRow); sheet.addRow([]);
 
-    // --- التسويات (لون فاتح: FFE8F8F5) ---
     if(adjs && adjs.length > 0){
         const adjHeader = sheet.addRow(['المبالغ المخصصة (التسويات)']); sheet.mergeCells(`A${adjHeader.number}:E${adjHeader.number}`); applyHeaderStyle(adjHeader, 'FF16A085');
         const adjCols = sheet.addRow(['الوصف', 'النوع', 'التاريخ', '', 'المبلغ']);
@@ -419,36 +432,38 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
         adjs.forEach(a => {
             const r = sheet.addRow([a.desc, a.type === 'plus' ? 'إضافة (+)' : 'خصم (-)', a.date, '', a.amount]);
             r.getCell(5).font = { bold: true, color: { argb: a.type === 'plus' ? 'FFC0392B' : 'FF27AE60' } };
-            applyDataRowStyle(r, 'FFEFFBF9'); // Very pale teal tint
+            applyDataRowStyle(r, 'FFEFFBF9');
         });
         const adjTotalRow = sheet.addRow(['صافي التسويات', '', '', '', stats.adjNet]); applyTotalRowStyle(adjTotalRow); sheet.addRow([]);
     }
 
-    // --- المصروفات (لون فاتح: FFF2F2F2) ---
     const expHeader = sheet.addRow(['تفاصيل المصروفات']); sheet.mergeCells(`A${expHeader.number}:E${expHeader.number}`); applyHeaderStyle(expHeader, 'FFC0392B');
     const expCols = sheet.addRow(['الوصف', 'المندوب', 'التاريخ', '', 'المبلغ']); expCols.font = { bold: true }; expCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
     exps.forEach(exp => { const r = sheet.addRow([exp.desc, name, exp.date, '', exp.amount]); applyDataRowStyle(r, 'FFFFF5F5'); });
     const expTotalRow = sheet.addRow(['المجموع', '', '', '', stats.expenses]); applyTotalRowStyle(expTotalRow); sheet.addRow([]);
 
-    // --- الانتظار (لون فاتح: FFF5EEF8) ---
     if(pendingInvs && pendingInvs.length > 0){
-        sheet.addRow([]); const pendingHeader = sheet.addRow(['فواتير بانتظار التحويل (منفصلة)']); sheet.mergeCells(`A${pendingHeader.number}:E${pendingHeader.number}`); applyHeaderStyle(pendingHeader, 'FF8E44AD');
-        const pendingCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']); pendingCols.font = { bold: true };
-        pendingInvs.forEach(inv => { const r = sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); applyDataRowStyle(r, 'FFF4ECF7'); }); // Pale purple
-        const pendingTotalRow = sheet.addRow(['إجمالي الانتظار', '', '', '', stats.pending]); applyTotalRowStyle(pendingTotalRow); sheet.addRow([]);
+        const pHeader = sheet.addRow(['فواتير بانتظار التحويل']); sheet.mergeCells(`A${pHeader.number}:E${pHeader.number}`); applyHeaderStyle(pHeader, 'FF8E44AD');
+        const pCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
+        pCols.font = { bold: true }; pCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
+        pendingInvs.forEach(inv => { const r = sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); applyDataRowStyle(r, 'FFF9F2FD'); });
+        const pTotal = pendingInvs.reduce((a,b) => a + b.due, 0);
+        const pTotalRow = sheet.addRow(['المجموع', '', '', '', pTotal]); applyTotalRowStyle(pTotalRow); sheet.addRow([]);
     }
 
-    // --- الآجل (لون فاتح: FFEAFAF1) ---
-    const totalDelayed = delayedInvs.reduce((a,b)=>a+b.due,0);
-    const delayHeader = sheet.addRow(['الفواتير الآجلة المتبقية (للعلم فقط)']); sheet.mergeCells(`A${delayHeader.number}:E${delayHeader.number}`); applyHeaderStyle(delayHeader, 'FF27AE60');
-    const delayCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']); delayCols.font = { bold: true };
-    delayedInvs.forEach(inv => { const r = sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); applyDataRowStyle(r, 'FFF0F9F4'); }); // Pale green
-    const delayTotalRow = sheet.addRow(['إجمالي الآجل', '', '', '', totalDelayed]); applyTotalRowStyle(delayTotalRow);
+    if(delayedInvs && delayedInvs.length > 0){
+        const dHeader = sheet.addRow(['فواتير آجلة (للمعلومة)']); sheet.mergeCells(`A${dHeader.number}:E${dHeader.number}`); applyHeaderStyle(dHeader, 'FF2980B9');
+        const dCols = sheet.addRow(['المرجع', 'العميل', 'تاريخ الفاتورة', 'تاريخ الاستحقاق', 'المبلغ']);
+        dCols.font = { bold: true }; dCols.eachCell(c => c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'}});
+        delayedInvs.forEach(inv => { const r = sheet.addRow([inv.ref, inv.customer, inv.date, inv.dueDate, inv.due]); applyDataRowStyle(r, 'FFF2F9FF'); });
+        const dTotal = delayedInvs.reduce((a,b) => a + b.due, 0);
+        const dTotalRow = sheet.addRow(['المجموع', '', '', '', dTotal]); applyTotalRowStyle(dTotalRow); sheet.addRow([]);
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `تقرير_${name}_${dateVal.replace(/[:/]/g,'-')}.xlsx`);
+    saveAs(new Blob([buffer]), `التقرير_المالي_${name}_${dateVal}.xlsx`);
 }
+
 init();
 </script>
 </body>

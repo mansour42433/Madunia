@@ -12,48 +12,68 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
     };
 
+    // دالة مساعدة لجلب كافة الصفحات بشكل آمن ومستقر
+    async function fetchAllPages(baseUrl) {
+        let allItems = [];
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+            const url = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}page=${page}`;
+            try {
+                const response = await fetch(url, { headers });
+                if (!response.ok) {
+                    hasMore = false;
+                    break;
+                }
+                
+                const data = await response.json();
+                const keys = Object.keys(data);
+                const items = data[keys[0]] || [];
+
+                if (items.length === 0) {
+                    hasMore = false;
+                } else {
+                    allItems = allItems.concat(items);
+                    page++;
+                    // حد أمان (20 صفحة = 2000 سجل) لضمان عدم حدوث Timeout في Vercel
+                    if (page > 20) hasMore = false; 
+                }
+            } catch (e) {
+                hasMore = false;
+                break;
+            }
+        }
+        return allItems;
+    }
+
     try {
-        // 1️⃣ جلب الفواتير غير المدفوعة فقط (الحل الصحيح)
-        const invUrl =
-            "https://www.qoyod.com/api/2.0/invoices" +
-            "?q[status_not_eq]=Draft" +
-            "&q[status_not_eq]=Voided" +
-            "&q[status_not_eq]=Paid" +
-            "&limit=500";
+        // 1️⃣ جلب الفواتير المعلقة فقط (الموافق عليها والمدفوعة جزئياً)
+        const invBaseUrl = "https://www.qoyod.com/api/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&q[status_not_eq]=Paid&per_page=100";
+        
+        // 2️⃣ جلب العملاء لربط الأسماء
+        const custBaseUrl = "https://www.qoyod.com/api/2.0/customers?per_page=100";
 
-        // 2️⃣ جلب العملاء
-        const custUrl = "https://www.qoyod.com/api/2.0/customers?limit=500";
-
-        // 3️⃣ جلب منتج الآجل
+        // 3️⃣ جلب منتج الآجل (للتأكد من SKU)
         const prodUrl = "https://www.qoyod.com/api/2.0/products?q[sku_eq]=754500950512";
 
-        const [invRes, custRes, prodRes] = await Promise.all([
-            fetch(invUrl, { headers }),
-            fetch(custUrl, { headers }),
+        const [invoices, customers, prodRes] = await Promise.all([
+            fetchAllPages(invBaseUrl),
+            fetchAllPages(custBaseUrl),
             fetch(prodUrl, { headers })
         ]);
 
-        if (!invRes.ok) {
-            throw new Error("فشل جلب الفواتير من قيود");
-        }
-
-        const invData = await invRes.json();
-        const custData = await custRes.json();
         const prodData = await prodRes.json();
-
-        const targetProduct =
-            prodData.products && prodData.products.length
-                ? prodData.products[0]
-                : null;
+        const targetProduct = prodData.products && prodData.products.length ? prodData.products[0] : null;
 
         return res.status(200).json({
-            invoices: { invoices: invData.invoices || [] },
-            customers: { customers: custData.customers || [] },
+            invoices: { invoices: invoices },
+            customers: { customers: customers },
             target_product: targetProduct
         });
 
     } catch (err) {
         console.error("QOYOD ERROR:", err);
-        return res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: "فشل في جلب البيانات من قيود. تأكد من مفتاح الـ API." });
     }
 }

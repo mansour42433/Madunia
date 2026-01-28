@@ -356,6 +356,7 @@ function updateFloatingBar(){
              else if(currentTab==='debt') buttonsHTML+=`<button onclick="removeFromDebt()" style="background:#f39c12">إزالة من المديونية</button>`;
              else if(currentTab==='cash') { buttonsHTML+=`<button onclick="markAsDelayed()" style="background:var(--p)">تحويل آجل</button>`; buttonsHTML+=`<button onclick="moveToDebt()" style="background:#e74c3c">نقل للمديونية</button>`; }
              buttonsHTML+=`<button onclick="moveToPending()" style="background:var(--pending); margin-right:10px;">نقل للانتظار</button>`;
+             buttonsHTML+=`<button onclick="transferToAnotherCreator()" style="background:#34495e; margin-right:10px;"><i class="fas fa-exchange-alt"></i> نقل لمندوب آخر</button>`;
         }
         actionsDiv.innerHTML = buttonsHTML;
     } else bar.classList.remove("show");
@@ -366,6 +367,56 @@ function removeFromPending(){ pendingIds = pendingIds.filter(id => !selectedIds.
 function moveToDebt(){ selectedIds.forEach(id=>{ if(!debtIds.includes(id)) debtIds.push(id); }); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
 function removeFromDebt(){ debtIds=debtIds.filter(id=>!selectedIds.has(id)); localStorage.setItem(STORAGE.DEBT_IDS,JSON.stringify(debtIds)); calculateStats(); renderCurrentTab(); }
 function markAsDelayed(){ invoices.forEach(inv=>{ if(selectedIds.has(inv.id)) inv.is_delayed=true; }); localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices)); renderCurrentTab(); }
+
+function transferToAnotherCreator() {
+    const password = prompt("الرجاء إدخال كلمة المرور للنقل:");
+    if (password !== "4243") {
+        alert("كلمة المرور غير صحيحة!");
+        return;
+    }
+
+    const allCreators = new Set();
+    invoices.forEach(i => allCreators.add(i.creator));
+    const creators = [...allCreators].filter(Boolean);
+    
+    if (creators.length === 0) {
+        alert("لا يوجد مناديب متاحين للنقل إليهم.");
+        return;
+    }
+
+    let message = "اختر المندوب الجديد:\n";
+    creators.forEach((c, index) => {
+        const n = nicknames[c] || c;
+        message += `${index + 1} - ${n}\n`;
+    });
+
+    const choice = prompt(message);
+    const selectedIndex = parseInt(choice) - 1;
+
+    if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= creators.length) {
+        alert("اختيار غير صحيح.");
+        return;
+    }
+
+    const newCreator = creators[selectedIndex];
+    const newCreatorName = nicknames[newCreator] || newCreator;
+
+    if (confirm(`هل أنت متأكد من نقل ${selectedIds.size} فاتورة إلى المندوب: ${newCreatorName}؟`)) {
+        invoices.forEach(inv => {
+            if (selectedIds.has(inv.id)) {
+                inv.creator = newCreator;
+            }
+        });
+        localStorage.setItem(STORAGE.INVOICES, JSON.stringify(invoices));
+        
+        // تحديث المصروفات والتسويات المرتبطة إذا لزم الأمر (اختياري حسب رغبة المستخدم، لكن الطلب ركز على الفاتورة)
+        
+        selectedIds.clear();
+        calculateStats();
+        renderCurrentTab();
+        alert("تم نقل الفواتير بنجاح.");
+    }
+}
 
 function renderNicks(){ updateCreatorsList(); }
 function updateCreatorsList(){

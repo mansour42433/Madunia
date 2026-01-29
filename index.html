@@ -492,7 +492,7 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
         });
     };
 
-    sheet.addRow(['التقرير المالي الشامل (ديناميكي)']); sheet.mergeCells('A1:E1');
+    sheet.addRow(['تقرير مديونية المندوب']); sheet.mergeCells('A1:E1');
     const titleRow = sheet.getRow(1); applyHeaderStyle(titleRow, 'FF2C3E50'); titleRow.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
 
     const now = new Date();
@@ -616,9 +616,7 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const nowTime = new Date();
-    const fileNameTime = nowTime.getHours() + "-" + nowTime.getMinutes() + "-" + nowTime.getSeconds();
-    saveAs(new Blob([buffer]), `التقرير_المالي_ديناميكي_${name}_${dateVal}_${fileNameTime}.xlsx`);
+    saveAs(new Blob([buffer]), `${name} - ${dateVal}.xlsx`);
 }
 
 // تشغيل النظام

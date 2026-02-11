@@ -49,13 +49,13 @@ export default async function handler(req, res) {
 
     try {
         // 1️⃣ جلب الفواتير المعلقة فقط (الموافق عليها والمدفوعة جزئياً)
-        const invBaseUrl = "https://www.qoyod.com/api/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&q[status_not_eq]=Paid&per_page=100";
+        const invBaseUrl = "https://api.qoyod.com/2.0/invoices?q[status_not_eq]=Draft&q[status_not_eq]=Voided&q[status_not_eq]=Paid&per_page=100";
         
         // 2️⃣ جلب العملاء لربط الأسماء
-        const custBaseUrl = "https://www.qoyod.com/api/2.0/customers?per_page=100";
+        const custBaseUrl = "https://api.qoyod.com/2.0/customers?per_page=100";
 
         // 3️⃣ جلب منتج الآجل (للتأكد من SKU)
-        const prodUrl = "https://www.qoyod.com/api/2.0/products?q[sku_eq]=754500950512";
+        const prodUrl = "https://api.qoyod.com/2.0/products?q[sku_eq]=754500950512";
 
         const [invoices, customers, prodRes] = await Promise.all([
             fetchAllPages(invBaseUrl),

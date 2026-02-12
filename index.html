@@ -65,6 +65,18 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
 .form-group {flex: 1;}
 .form-group label {display: block; font-size: 0.8em; margin-bottom: 5px; color: #555;}
 .history-item {border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd;}
+
+/* المودال */
+.modal {display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s;}
+.modal-content {background-color: #fefefe; margin: 5% auto; padding: 0; border-radius: 15px; width: 90%; max-width: 600px; box-shadow: 0 10px 50px rgba(0,0,0,0.3); animation: slideDown 0.3s;}
+.modal-header {padding: 20px; background: var(--o); color: white; border-radius: 15px 15px 0 0; display: flex; justify-content: space-between; align-items: center;}
+.modal-header h3 {margin: 0; display: flex; align-items: center; gap: 10px;}
+.modal-close {color: white; font-size: 28px; font-weight: bold; cursor: pointer; background: none; border: none; padding: 0; width: 35px; height: 35px; border-radius: 50%; transition: 0.3s;}
+.modal-close:hover {background: rgba(255,255,255,0.2);}
+.modal-body {padding: 25px;}
+.modal-footer {padding: 15px 25px; background: #f8f9fa; border-radius: 0 0 15px 15px; display: flex; gap: 10px; justify-content: flex-end;}
+@keyframes fadeIn {from {opacity: 0;} to {opacity: 1;}}
+@keyframes slideDown {from {transform: translateY(-50px); opacity: 0;} to {transform: translateY(0); opacity: 1;}}
 </style>
 </head>
 <body>
@@ -78,6 +90,7 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
         <div style="margin-right: auto; display:flex; gap:10px;">
             <select id="creatorFilter" onchange="handleFilterChange()"><option value="all">كل المناديب</option></select>
             <input id="searchInput" placeholder="بحث بالمرجع أو العميل..." onkeyup="renderCurrentTab()">
+            <button onclick="openInvoiceFilter()" style="background:var(--o)"><i class="fas fa-filter"></i> فلترة متقدمة</button>
         </div>
     </div>
 
@@ -146,6 +159,32 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
 
 <div class="floating-bar" id="floatBar"><div>تم تحديد: <span id="selCount">0</span></div><div id="actionButtons" style="margin-right:20px"></div></div>
 
+<!-- مودال الفلترة -->
+<div id="filterModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-filter"></i> فلترة متقدمة للفواتير</h3>
+            <button class="modal-close" onclick="closeInvoiceFilter()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:#555; margin-bottom:15px">الصق أرقام الفواتير التي تريد فلترتها (كل رقم في سطر):</p>
+            <textarea id="filterInvoiceNumbers" style="width:100%; height:250px; padding:15px; border:2px solid #ddd; border-radius:8px; font-family:'Cairo'; font-size:1em; resize:vertical" placeholder="مثال:
+4609
+4610
+4647
+4714
+4721"></textarea>
+            <div style="margin-top:15px; padding:10px; background:#fff3cd; border-radius:8px; color:#856404; font-size:0.9em">
+                <i class="fas fa-info-circle"></i> <strong>ملاحظة:</strong> سيتم فلترة الفواتير في التبويب الحالي فقط. لإلغاء الفلترة، امسح الأرقام واضغط "تطبيق".
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeInvoiceFilter()" style="background:#95a5a6"><i class="fas fa-times"></i> إلغاء</button>
+            <button onclick="applyInvoiceFilter()" style="background:var(--g)"><i class="fas fa-check"></i> تطبيق الفلترة</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // --- إعدادات النظام ---
 const API_URL = "/api/get-data"; 
@@ -164,6 +203,7 @@ const STORAGE = {
 // --- المتغيرات العامة ---
 let invoices=[], debtIds=[], pendingIds=[], expenses=[], adjustments=[], nicknames={}, historyLog=[], customers={}, selectedIds=new Set(), currentTab='delayed';
 let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, pending: 0, adjNet: 0 };
+let invoiceNumberFilter = []; // فلتر أرقام الفواتير
 
 // --- التشغيل الأولي ---
 function init(){
@@ -232,7 +272,9 @@ function getFilteredInvoices(){
         else if(currentTab==='delayed') tabMatch = inv.is_delayed && !isDebt && !isPending; 
         else if(currentTab==='cash') tabMatch = !inv.is_delayed && !isDebt && !isPending; 
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
-        return tabMatch&&searchMatch;
+        // فلتر الأرقام المتقدم
+        const numberMatch = invoiceNumberFilter.length === 0 || invoiceNumberFilter.includes(inv.ref);
+        return tabMatch&&searchMatch&&numberMatch;
     });
 }
 
@@ -617,6 +659,57 @@ async function generateColoredExcel(name, debtInvs, exps, adjs, delayedInvs, pen
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `${name} - ${dateVal}.xlsx`);
+}
+
+// --- دوال الفلترة المتقدمة ---
+function openInvoiceFilter() {
+    const modal = document.getElementById('filterModal');
+    const textarea = document.getElementById('filterInvoiceNumbers');
+    // تحميل الأرقام الحالية في الفلتر
+    textarea.value = invoiceNumberFilter.join('\n');
+    modal.style.display = 'block';
+}
+
+function closeInvoiceFilter() {
+    const modal = document.getElementById('filterModal');
+    modal.style.display = 'none';
+}
+
+function applyInvoiceFilter() {
+    const textarea = document.getElementById('filterInvoiceNumbers');
+    const text = textarea.value.trim();
+    
+    if (text === '') {
+        // إلغاء الفلترة
+        invoiceNumberFilter = [];
+    } else {
+        // فصل الأرقام بناءً على الأسطر وتنظيفها
+        invoiceNumberFilter = text.split('\n')
+            .map(line => line.trim())
+            .filter(line => line !== '');
+    }
+    
+    closeInvoiceFilter();
+    renderCurrentTab();
+    
+    // إظهار رسالة تأكيد
+    const status = document.getElementById('status');
+    if (invoiceNumberFilter.length > 0) {
+        status.innerText = `✅ تم فلترة ${invoiceNumberFilter.length} فاتورة`;
+        status.style.color = 'var(--g)';
+    } else {
+        status.innerText = '✅ تم إلغاء الفلترة';
+        status.style.color = 'var(--p)';
+    }
+    setTimeout(() => status.innerText = '', 3000);
+}
+
+// إغلاق المودال عند الضغط خارجه
+window.onclick = function(event) {
+    const modal = document.getElementById('filterModal');
+    if (event.target === modal) {
+        closeInvoiceFilter();
+    }
 }
 
 // تشغيل النظام

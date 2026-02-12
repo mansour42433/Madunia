@@ -169,11 +169,16 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
         <div class="modal-body">
             <p style="color:#555; margin-bottom:15px">الصق أرقام الفواتير التي تريد فلترتها (كل رقم في سطر):</p>
             <textarea id="filterInvoiceNumbers" style="width:100%; height:250px; padding:15px; border:2px solid #ddd; border-radius:8px; font-family:'Cairo'; font-size:1em; resize:vertical" placeholder="مثال:
+INV4609
+INV4610
+INV4647
+INV4714
+INV4721
+
+أو فقط الأرقام:
 4609
 4610
-4647
-4714
-4721"></textarea>
+4647"></textarea>
             <div style="margin-top:15px; padding:10px; background:#fff3cd; border-radius:8px; color:#856404; font-size:0.9em">
                 <i class="fas fa-info-circle"></i> <strong>ملاحظة:</strong> سيتم فلترة الفواتير في التبويب الحالي فقط. لإلغاء الفلترة، امسح الأرقام واضغط "تطبيق".
             </div>
@@ -273,7 +278,7 @@ function getFilteredInvoices(){
         else if(currentTab==='cash') tabMatch = !inv.is_delayed && !isDebt && !isPending; 
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
         // فلتر الأرقام المتقدم
-        const numberMatch = invoiceNumberFilter.length === 0 || invoiceNumberFilter.includes(inv.ref);
+        const numberMatch = invoiceNumberFilter.length === 0 || invoiceNumberFilter.includes(inv.ref.toUpperCase());
         return tabMatch&&searchMatch&&numberMatch;
     });
 }
@@ -685,7 +690,14 @@ function applyInvoiceFilter() {
     } else {
         // فصل الأرقام بناءً على الأسطر وتنظيفها
         invoiceNumberFilter = text.split('\n')
-            .map(line => line.trim())
+            .map(line => {
+                line = line.trim();
+                // إذا كان الرقم لا يحتوي على INV في البداية، أضفها
+                if (line !== '' && !line.toUpperCase().startsWith('INV')) {
+                    return 'INV' + line;
+                }
+                return line.toUpperCase();
+            })
             .filter(line => line !== '');
     }
     

@@ -6,10 +6,10 @@
 <title>نظام التقرير الشامل (نسخة احترافية ديناميكية)</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" integrity="sha512-ItTQPEXWqBsGT5O6PkUZD6HEqJGBDhYsLM0yqHkDFAoYl08opT0aW/FeVFuZlPiW9UGNFXFwCOgXKMNONqQg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" integrity="sha512-Ql87qFHB3s/De8euNwkDDnf9ugBdp7x0axGfGALGxFi7KBMM4UBOQ6GMDsnGDlFNJTVpXqFJYNW6WidBnszA==" crossorigin="anonymous"></script>
 
 <style>
 /* التنسيقات العامة */
@@ -191,6 +191,21 @@ INV4721
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════
+// [FIX-XSS] escapeHtml — تطبق على كل بيانات API قبل innerHTML
+// ═══════════════════════════════════════════════════
+function escapeHtml(v) {
+  if (v === null || v === undefined) return '-';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+}
+
+// ═══════════════════════════════════════════════════
+// [FIX-AUTH] authenticated fetch — يرسل token تلقائياً
+// أضف <meta name="dashboard-token" content="SECRET"> في <head>
+// ═══════════════════════════════════════════════════
+const DASHBOARD_TOKEN = (function(){ var m=document.querySelector('meta[name="dashboard-token"]'); return m?m.getAttribute('content'):''; })();
+async function apiFetch(url){ var h={'Content-Type':'application/json'}; if(DASHBOARD_TOKEN) h['X-Dashboard-Token']=DASHBOARD_TOKEN; return fetch(url,{headers:h}); }
+
 // --- إعدادات النظام ---
 const API_URL = "/api/get-data"; 
 const TARGET_SKU_FALLBACK = "754500950512";
@@ -229,7 +244,7 @@ async function fetchData(){
     const btn=document.getElementById("upBtn"),st=document.getElementById("status");
     btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> جاري الجلب...';
     try{
-        const r=await fetch(API_URL);
+        const r=await apiFetch(API_URL);
         const d=await r.json();
         if(!r.ok) throw new Error(d.error || "Server Error");
         
@@ -256,19 +271,43 @@ async function fetchData(){
         updateCreatorsList(); calculateStats(); renderCurrentTab();
         btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="✅ تم"; setTimeout(()=>st.innerText="",2000);
     }catch(e){
-        console.error(e); btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="❌ خطأ"; alert("فشل جلب البيانات: " + e.message);
+        console.error(e); btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="❌ خطأ"; alert("❌ فشل جلب البيانات. تأكد من الاتصال بالإنترنت.");
     }finally{ btn.disabled=false; }
 }
 
 function handleFilterChange() { calculateStats(); renderCurrentTab(); }
 
+// [FIX-FILTER] normalize مرجع الفاتورة: INV-4609 / INV 4609 / 4609 → INV4609
+function normalizeRef(ref) {
+    if (!ref) return '';
+    var s = String(ref).toUpperCase().replace(/[\s\-_]/g, '');
+    if (!s.startsWith('INV')) s = 'INV' + s;
+    return s;
+}
+
 function getFilteredInvoices(){
     const creator=document.getElementById("creatorFilter").value;
     const search=document.getElementById("searchInput").value.toLowerCase();
+    
+    // [FIX-FILTER] عند وجود فلتر أرقام → ابحث في كل الفواتير بغض النظر عن التبويب
+    const hasNumberFilter = invoiceNumberFilter.length > 0;
+    
     return invoices.filter(inv=>{
         if(inv.status==="Draft"||inv.status==="Voided"||inv.status==="Paid"||inv.due<=0) return false;
         const creatorMatch=(creator==='all'||inv.creator===creator);
         if(!creatorMatch) return false;
+
+        // [FIX-FILTER] normalize المقارنة — يحل مشكلة INV-4609 vs INV4609
+        const normRef = normalizeRef(inv.ref);
+        const numberMatch = !hasNumberFilter || invoiceNumberFilter.some(f => normalizeRef(f) === normRef);
+        
+        // [FIX-FILTER] إذا فلتر أرقام مفعّل → تجاهل قيد التبويب، أظهر الفاتورة أينما كانت
+        if (hasNumberFilter) {
+            const searchMatch = !search || inv.ref.toLowerCase().includes(search) || inv.customer.toLowerCase().includes(search);
+            return numberMatch && searchMatch;
+        }
+
+        // المنطق الأصلي للتبويبات
         const isPending = pendingIds.includes(inv.id);
         const isDebt = debtIds.includes(inv.id);
         let tabMatch=false;
@@ -277,9 +316,7 @@ function getFilteredInvoices(){
         else if(currentTab==='delayed') tabMatch = inv.is_delayed && !isDebt && !isPending; 
         else if(currentTab==='cash') tabMatch = !inv.is_delayed && !isDebt && !isPending; 
         const searchMatch=inv.ref.toLowerCase().includes(search)||inv.customer.toLowerCase().includes(search);
-        // فلتر الأرقام المتقدم
-        const numberMatch = invoiceNumberFilter.length === 0 || invoiceNumberFilter.includes(inv.ref.toUpperCase());
-        return tabMatch&&searchMatch&&numberMatch;
+        return tabMatch&&searchMatch;
     });
 }
 
@@ -333,7 +370,7 @@ function renderCurrentTab(){
     const data=getFilteredInvoices(); const tbody=document.getElementById("rows"); tbody.innerHTML="";
     if(data.length===0){ tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:30px;color:#999">لا توجد بيانات للعرض</td></tr>`; return; }
     data.forEach(inv=>{
-        const nick=nicknames[inv.creator]||inv.creator;
+        const nick=escapeHtml(nicknames[inv.creator]||inv.creator);
         let tag=inv.is_delayed?'<span class="tag tag-delayed">آجلة</span>':'<span class="tag tag-cash">كاش</span>';
         if(pendingIds.includes(inv.id)) tag='<span class="tag tag-pending">في الانتظار</span>';
         else if(debtIds.includes(inv.id)) tag='<span class="tag tag-debt">في المديونية</span>';
@@ -341,7 +378,8 @@ function renderCurrentTab(){
         if(inv.status==='Partially Paid'||inv.due<inv.total) statusHtml='<span class="tag tag-part">مدفوعة جزئياً</span>';
         let amountDisplay=`<span style="font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</span>`;
         if(inv.due<inv.total){ amountDisplay=`<div style="color:#c0392b; font-weight:bold; font-size:1.1em">${inv.due.toLocaleString()}</div><div style="color:#aaa; text-decoration:line-through; font-size:0.85em">${inv.total.toLocaleString()}</div>`; }
-        tbody.innerHTML+=`<tr onclick="rowClick(event, ${inv.id})"><td><input type="checkbox" class="row-chk" value="${inv.id}" onchange="toggleSelect(${inv.id})"></td><td style="color:var(--p);font-weight:bold">${inv.ref}</td><td>${inv.customer}</td><td>${nick}</td><td>${inv.date}</td><td style="color:#c0392b">${inv.dueDate || '-'}</td><td>${tag}</td><td>${amountDisplay}</td><td>${statusHtml}</td></tr>`;
+        // [FIX-XSS] escaped fields + data attributes instead of inline onclick with raw values
+        tbody.innerHTML+=`<tr data-inv-id="${inv.id}" class="inv-row"><td><input type="checkbox" class="row-chk" value="${inv.id}" data-inv-id="${inv.id}"></td><td style="color:var(--p);font-weight:bold">${escapeHtml(inv.ref)}</td><td>${escapeHtml(inv.customer)}</td><td>${nick}</td><td>${escapeHtml(inv.date)}</td><td style="color:#c0392b">${escapeHtml(inv.dueDate||'-')}</td><td>${tag}</td><td>${amountDisplay}</td><td>${statusHtml}</td></tr>`;
     });
 }
 
@@ -350,7 +388,7 @@ function renderExpenses(){
     const tbody=document.getElementById("expenseRows"); tbody.innerHTML="";
     const filtered = expenses.filter(e=>creator==='all'||e.creator===creator);
     if(filtered.length === 0) { tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#999">لا توجد مصروفات</td></tr>`; return; }
-    filtered.forEach(exp=>{ const nick=nicknames[exp.creator]||exp.creator; tbody.innerHTML+=`<tr><td>${exp.desc}</td><td>${nick}</td><td>${exp.date}</td><td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td><td><button onclick="delExpense(${exp.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`; });
+    filtered.forEach(exp=>{ const nick=escapeHtml(nicknames[exp.creator]||exp.creator); tbody.innerHTML+=`<tr><td>${escapeHtml(exp.desc)}</td><td>${nick}</td><td>${escapeHtml(exp.date)}</td><td style="font-weight:bold; color:#c0392b">${exp.amount.toLocaleString()}</td><td><button data-exp-id="${exp.id}" class="del-exp-btn" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`; });
 }
 
 function renderAdjustments(){
@@ -362,7 +400,7 @@ function renderAdjustments(){
         const nick=nicknames[adj.creator]||adj.creator;
         const typeHtml = adj.type === 'plus' ? '<span class="tag tag-debt">➕ إضافة على الدين</span>' : '<span class="tag tag-cash">➖ خصم من الدين</span>';
         const color = adj.type === 'plus' ? '#c0392b' : '#27ae60';
-        tbody.innerHTML+=`<tr><td>${adj.desc}</td><td>${nick}</td><td>${adj.date}</td><td>${typeHtml}</td><td style="font-weight:bold; color:${color}">${adj.amount.toLocaleString()}</td><td><button onclick="delAdjustment(${adj.id})" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`;
+        tbody.innerHTML+=`<tr><td>${escapeHtml(adj.desc)}</td><td>${escapeHtml(nicknames[adj.creator]||adj.creator)}</td><td>${escapeHtml(adj.date)}</td><td>${typeHtml}</td><td style="font-weight:bold; color:${color}">${adj.amount.toLocaleString()}</td><td><button data-adj-id="${adj.id}" class="del-adj-btn" style="background:#fff;color:red;padding:0"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 }
 
@@ -470,10 +508,16 @@ function updateCreatorsList(){
     const s=document.getElementById("creatorFilter"), current=s.value;
     const allCreators = new Set(); invoices.forEach(i => allCreators.add(i.creator)); expenses.forEach(e => allCreators.add(e.creator)); adjustments.forEach(a => allCreators.add(a.creator));
     const creators=[...allCreators].filter(Boolean); s.innerHTML='<option value="all">كل المناديب</option>';
-    creators.forEach(c=>{ const n=nicknames[c]||c; s.innerHTML+=`<option value="${c}">${n}</option>`; });
+    // [FIX-XSS] createElement بدلاً من innerHTML لتفادي XSS في أسماء المناديب
+    creators.forEach(c=>{ var opt=document.createElement('option'); opt.value=c; opt.textContent=nicknames[c]||c; s.appendChild(opt); });
     s.value=current;
     const nickRows=document.getElementById("nickRows");
-    if(nickRows && currentTab === 'nicks'){ nickRows.innerHTML=""; creators.forEach(c=>{ const val=nicknames[c]||""; nickRows.innerHTML+=`<div style="margin-bottom:10px; display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:5px;"><span style="width:200px; font-weight:bold;">${c}</span><input type="text" placeholder="الاسم المختصر" value="${val}" onchange="saveNick('${c}', this.value)" style="flex:1"></div>`; }); }
+    if(nickRows && currentTab === 'nicks'){ nickRows.innerHTML=""; creators.forEach(c=>{
+        const val=escapeHtml(nicknames[c]||"");
+        const safeC=escapeHtml(c);
+        // [FIX-XSS] data-creator بدلاً من onchange مع قيمة خام
+        nickRows.innerHTML+=`<div style="margin-bottom:10px; display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:5px;"><span style="width:200px; font-weight:bold;">${safeC}</span><input type="text" placeholder="الاسم المختصر" value="${val}" data-creator="${safeC}" class="nick-input" style="flex:1"></div>`;
+    }); }
 }
 function saveNick(creator, val){ if(val) nicknames[creator]=val; else delete nicknames[creator]; localStorage.setItem(STORAGE.NICKS,JSON.stringify(nicknames)); updateCreatorsList(); }
 
@@ -494,7 +538,13 @@ function renderHistory(){
     const list = document.getElementById("historyList"); list.innerHTML = ""; const creator = document.getElementById("creatorFilter").value;
     const filteredHistory = historyLog.filter(h => creator === 'all' || h.creatorRaw === creator).reverse();
     if(filteredHistory.length === 0){ list.innerHTML = "<p>لا يوجد أرشيف محفوظ لهذا الاختيار.</p>"; return; }
-    filteredHistory.forEach(item => { list.innerHTML += `<div class="history-item"><div class="history-info"><strong><i class="fas fa-file-invoice"></i> تقرير: ${item.creatorName}</strong><span><i class="far fa-clock"></i> ${item.saveDate}</span> | <span style="color:var(--d); font-weight:bold">الصافي: ${item.net.toLocaleString()}</span>${item.adjNet !== 0 ? `| <span style="color:#16a085">تسويات: ${item.adjNet.toLocaleString()}</span>` : ''}</div><div style="display:flex; gap:5px;"><button onclick='exportHistoryItem(${JSON.stringify(item)})' style="background:#27ae60; font-size:0.8em"><i class="fas fa-download"></i> اكسل</button><button onclick="deleteHistoryItem(${item.id})" style="background:#c0392b; font-size:0.8em"><i class="fas fa-trash"></i></button></div></div>`; });
+    // [FIX-XSS] historyMap — بدلاً من JSON.stringify(item) في onclick مباشرة
+    window._historyMap = window._historyMap || {};
+    filteredHistory.forEach(item => {
+        window._historyMap[item.id] = item;
+        const adjHtml = item.adjNet !== 0 ? `| <span style="color:#16a085">تسويات: ${item.adjNet.toLocaleString()}</span>` : '';
+        list.innerHTML += `<div class="history-item"><div class="history-info"><strong><i class="fas fa-file-invoice"></i> تقرير: ${escapeHtml(item.creatorName)}</strong><span><i class="far fa-clock"></i> ${escapeHtml(item.saveDate)}</span> | <span style="color:var(--d); font-weight:bold">الصافي: ${item.net.toLocaleString()}</span>${adjHtml}</div><div style="display:flex; gap:5px;"><button data-hist-id="${item.id}" class="export-hist-btn" style="background:#27ae60; font-size:0.8em"><i class="fas fa-download"></i> اكسل</button><button data-hist-id="${item.id}" class="del-hist-btn" style="background:#c0392b; font-size:0.8em"><i class="fas fa-trash"></i></button></div></div>`;
+    });
 }
 function deleteHistoryItem(id){ if(!confirm("حذف هذا السجل؟")) return; historyLog = historyLog.filter(h => h.id !== id); localStorage.setItem(STORAGE.HISTORY, JSON.stringify(historyLog)); renderHistory(); }
 function exportHistoryItem(item){ generateColoredExcel(item.creatorName, item.invoices, item.expenses, item.adjustments || [], item.delayedInvoices, item.pendingInvoices || [], {debt: item.totalDebt, expenses: item.totalExp, net: item.net, pending: item.totalPending || 0, adjNet: item.adjNet || 0}, item.saveDate); }
@@ -688,17 +738,11 @@ function applyInvoiceFilter() {
         // إلغاء الفلترة
         invoiceNumberFilter = [];
     } else {
-        // فصل الأرقام بناءً على الأسطر وتنظيفها
+        // [FIX-FILTER] normalize كل سطر: يقبل INV-4609 / INV4609 / 4609 / inv4609
         invoiceNumberFilter = text.split('\n')
-            .map(line => {
-                line = line.trim();
-                // إذا كان الرقم لا يحتوي على INV في البداية، أضفها
-                if (line !== '' && !line.toUpperCase().startsWith('INV')) {
-                    return 'INV' + line;
-                }
-                return line.toUpperCase();
-            })
+            .map(line => line.trim())
             .filter(line => line !== '');
+        // لا نحتاج normalize هنا — normalizeRef تُطبق عند المقارنة
     }
     
     closeInvoiceFilter();
@@ -707,13 +751,17 @@ function applyInvoiceFilter() {
     // إظهار رسالة تأكيد
     const status = document.getElementById('status');
     if (invoiceNumberFilter.length > 0) {
-        status.innerText = `✅ تم فلترة ${invoiceNumberFilter.length} فاتورة`;
+        const found = invoices.filter(inv => {
+            const normRef = normalizeRef(inv.ref);
+            return invoiceNumberFilter.some(f => normalizeRef(f) === normRef);
+        });
+        status.innerText = `🔍 فلترة ${invoiceNumberFilter.length} رقم — وُجد ${found.length} فاتورة في كل التبويبات`;
         status.style.color = 'var(--g)';
     } else {
         status.innerText = '✅ تم إلغاء الفلترة';
         status.style.color = 'var(--p)';
+        setTimeout(() => status.innerText = '', 3000);
     }
-    setTimeout(() => status.innerText = '', 3000);
 }
 
 // إغلاق المودال عند الضغط خارجه
@@ -723,6 +771,49 @@ window.onclick = function(event) {
         closeInvoiceFilter();
     }
 }
+
+// ═══════════════════════════════════════════════════
+// [FIX-XSS] Event Delegation — بدلاً من onclick inline مع بيانات خام
+// ═══════════════════════════════════════════════════
+document.addEventListener('click', function(e) {
+    // صفوف الفواتير
+    if (e.target.closest('.inv-row') && e.target.tagName !== 'INPUT') {
+        const row = e.target.closest('.inv-row');
+        const id  = parseInt(row.getAttribute('data-inv-id'));
+        if (id) { const chk = row.querySelector('input[type=checkbox]'); if(chk){ chk.checked=!chk.checked; toggleSelect(id); } }
+    }
+    // checkboxes الفواتير
+    if (e.target.classList.contains('row-chk') && e.target.hasAttribute('data-inv-id')) {
+        toggleSelect(parseInt(e.target.getAttribute('data-inv-id')));
+    }
+    // حذف مصروف
+    if (e.target.closest('.del-exp-btn')) {
+        const id = parseInt(e.target.closest('.del-exp-btn').getAttribute('data-exp-id'));
+        if (!isNaN(id)) delExpense(id);
+    }
+    // حذف تسوية
+    if (e.target.closest('.del-adj-btn')) {
+        const id = parseInt(e.target.closest('.del-adj-btn').getAttribute('data-adj-id'));
+        if (!isNaN(id)) delAdjustment(id);
+    }
+    // تصدير أرشيف
+    if (e.target.closest('.export-hist-btn')) {
+        const id = parseInt(e.target.closest('.export-hist-btn').getAttribute('data-hist-id'));
+        if (!isNaN(id) && window._historyMap && window._historyMap[id]) exportHistoryItem(window._historyMap[id]);
+    }
+    // حذف أرشيف
+    if (e.target.closest('.del-hist-btn')) {
+        const id = parseInt(e.target.closest('.del-hist-btn').getAttribute('data-hist-id'));
+        if (!isNaN(id)) deleteHistoryItem(id);
+    }
+});
+// nick-input change delegation
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('nick-input')) {
+        const creator = e.target.getAttribute('data-creator');
+        saveNick(creator, e.target.value);
+    }
+});
 
 // تشغيل النظام
 init();

@@ -91,6 +91,7 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
             <select id="creatorFilter" onchange="handleFilterChange()"><option value="all">كل المناديب</option></select>
             <input id="searchInput" placeholder="بحث بالمرجع أو العميل..." onkeyup="renderCurrentTab()">
             <button onclick="openInvoiceFilter()" style="background:var(--o)"><i class="fas fa-filter"></i> فلترة متقدمة</button>
+            <button onclick="clearInvoiceFilter()" id="clearFilterBtn" style="background:#95a5a6; display:none;"><i class="fas fa-times"></i> مسح التصفية</button>
         </div>
     </div>
 
@@ -104,6 +105,7 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
     </div>
 
     <div style="display: flex; gap: 10px;">
+        <button onclick="goToProcessing()" class="export-all" style="background:#e74c3c"><i class="fas fa-arrow-left"></i> معالجة وتعديل الأسعار</button>
         <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير Excel (ديناميكي بالمعادلات)</button>
         <button onclick="saveToHistory()" class="save-archive"><i class="fas fa-save"></i> حفظ المديونية للأرشيف</button>
     </div>
@@ -154,6 +156,41 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
         <div id="nicksDiv" style="display:none; padding:20px;"><h3>تخصيص أسماء المناديب</h3><div id="nickRows"></div></div>
         
         <div id="historyDiv" style="display:none; padding:20px;"><h3 style="color:var(--p)">سجل المديونيات المحفوظة</h3><div id="historyList"></div></div>
+        
+        <div id="processingDiv" style="display:none; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0; color:var(--d)"><i class="fas fa-edit"></i> معالجة وتعديل الأسعار</h3>
+                <button onclick="backToMain()" style="background:#95a5a6"><i class="fas fa-arrow-right"></i> العودة</button>
+            </div>
+            <div style="background:#f0f0f0; padding:15px; border-radius:8px; margin-bottom:20px; color:#555;">
+                <i class="fas fa-info-circle"></i> <strong>التعليمات:</strong> يمكنك تعديل المبالغ في الجدول أدناه. الفروقات ستنتقل تلقائياً إلى "بانتظار التحويل". التعديلات مؤقتة وتُمسح عند تحديث البيانات.
+            </div>
+            <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
+                <table id="processingTable" style="width:100%;">
+                    <thead>
+                        <tr style="background:#f8f9fa;">
+                            <th style="padding:15px; text-align:right; font-weight:700;">المرجع</th>
+                            <th style="padding:15px; text-align:right; font-weight:700;">العميل</th>
+                            <th style="padding:15px; text-align:right; font-weight:700;">المندوب</th>
+                            <th style="padding:15px; text-align:right; font-weight:700;">المبلغ الأصلي</th>
+                            <th style="padding:15px; text-align:right; font-weight:700;">المبلغ المعدل</th>
+                            <th style="padding:15px; text-align:right; font-weight:700;">الفرق</th>
+                        </tr>
+                    </thead>
+                    <tbody id="processingRows"></tbody>
+                </table>
+            </div>
+            <div style="margin-top:20px; padding:15px; background:#e8f8f5; border-radius:8px; border-left:4px solid var(--adj);">
+                <strong style="color:var(--adj);">ملخص التعديلات:</strong>
+                <div style="margin-top:10px;">
+                    <div>إجمالي الفروقات المنقولة: <span id="totalDiffAmount" style="font-weight:bold; color:#c0392b;">0</span></div>
+                </div>
+            </div>
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button onclick="confirmProcessing()" class="export-all" style="background:var(--g); flex:1;"><i class="fas fa-check"></i> تأكيد وتصدير</button>
+                <button onclick="resetProcessing()" style="background:#95a5a6; flex:1; width:auto; justify-content:center;"><i class="fas fa-redo"></i> إعادة تعيين</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -501,11 +538,20 @@ function exportHistoryItem(item){ generateColoredExcel(item.creatorName, item.in
 
 function exportToExcel(isHistory = false) {
     if(isHistory) return; const creator = document.getElementById("creatorFilter").value; const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator); const dateStr = new Date().toISOString().split('T')[0];
-    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
+    
+    // تطبيق التعديلات المؤقتة على نسخة مؤقتة من الفواتير
+    const invoicesForExport = invoices.map(inv => {
+        if (tempInvoiceModifications[inv.id]) {
+            return { ...inv, due: tempInvoiceModifications[inv.id].modifiedAmount };
+        }
+        return inv;
+    });
+    
+    const debtInvoices = invoicesForExport.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     const filteredAdjustments = adjustments.filter(a => creator === 'all' || a.creator === creator);
-    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
-    const pendingInvoicesExport = invoices.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const delayedInvoices = invoicesForExport.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
+    const pendingInvoicesExport = invoicesForExport.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
     generateColoredExcel(creatorName, debtInvoices, filteredExpenses, filteredAdjustments, delayedInvoices, pendingInvoicesExport, currentStats, dateStr);
 }
 
@@ -723,6 +769,148 @@ window.onclick = function(event) {
         closeInvoiceFilter();
     }
 }
+
+// --- دوال مسح التصفية ---
+function clearInvoiceFilter() {
+    invoiceNumberFilter = [];
+    document.getElementById('clearFilterBtn').style.display = 'none';
+    renderCurrentTab();
+    const status = document.getElementById('status');
+    status.innerText = '✅ تم مسح التصفية';
+    status.style.color = 'var(--p)';
+    setTimeout(() => status.innerText = '', 3000);
+}
+
+// --- متغيرات مؤقتة للمعالجة ---
+let tempInvoiceModifications = {};
+let processingInvoices = [];
+
+// --- دوال مرحلة المعالجة ---
+function goToProcessing() {
+    const creator = document.getElementById('creatorFilter').value;
+    if (creator === 'all') {
+        alert('يجب اختيار مندوب أولاً!');
+        return;
+    }
+    
+    processingInvoices = getFilteredInvoices().filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id));
+    
+    if (processingInvoices.length === 0) {
+        alert('لا توجد فواتير للمعالجة');
+        return;
+    }
+    
+    tempInvoiceModifications = {};
+    currentTab = 'processing';
+    document.getElementById('mainContainer').style.display = 'none';
+    document.getElementById('processingDiv').style.display = 'block';
+    renderProcessingTable();
+}
+
+function backToMain() {
+    tempInvoiceModifications = {};
+    document.getElementById('processingDiv').style.display = 'none';
+    document.getElementById('mainContainer').style.display = 'block';
+    currentTab = 'delayed';
+    renderCurrentTab();
+}
+
+function renderProcessingTable() {
+    const tbody = document.getElementById('processingRows');
+    tbody.innerHTML = '';
+    let totalDiff = 0;
+    
+    processingInvoices.forEach(inv => {
+        const mod = tempInvoiceModifications[inv.id] || {};
+        const modifiedAmount = mod.modifiedAmount !== undefined ? mod.modifiedAmount : inv.due;
+        const difference = inv.due - modifiedAmount;
+        totalDiff += Math.abs(difference);
+        
+        const nick = nicknames[inv.creator] || inv.creator;
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #eee';
+        
+        row.innerHTML = `
+            <td style="padding:12px 15px;">${inv.ref}</td>
+            <td style="padding:12px 15px;">${inv.customer}</td>
+            <td style="padding:12px 15px;">${nick}</td>
+            <td style="padding:12px 15px; font-weight:bold;">${inv.due.toLocaleString()}</td>
+            <td style="padding:12px 15px;">
+                <input type="number" value="${modifiedAmount}" 
+                    onchange="updateProcessingAmount(${inv.id}, this.value)" 
+                    style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-family:'Cairo';"
+                    step="0.01">
+            </td>
+            <td style="padding:12px 15px; font-weight:bold; color:${difference > 0 ? '#c0392b' : '#27ae60'};">${difference.toLocaleString()}</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('totalDiffAmount').innerText = totalDiff.toLocaleString();
+}
+
+function updateProcessingAmount(invoiceId, newAmount) {
+    const newVal = parseFloat(newAmount) || 0;
+    const inv = processingInvoices.find(i => i.id === invoiceId);
+    
+    if (!inv) return;
+    
+    if (newVal < 0) {
+        alert('المبلغ يجب أن يكون موجباً');
+        return;
+    }
+    
+    if (newVal > inv.due) {
+        alert('المبلغ المعدل لا يمكن أن يكون أكبر من المبلغ الأصلي');
+        return;
+    }
+    
+    tempInvoiceModifications[invoiceId] = {
+        modifiedAmount: newVal,
+        difference: inv.due - newVal
+    };
+    
+    renderProcessingTable();
+}
+
+function confirmProcessing() {
+    Object.keys(tempInvoiceModifications).forEach(invId => {
+        const mod = tempInvoiceModifications[invId];
+        const inv = invoices.find(i => i.id == invId);
+        if (inv && mod.difference > 0) {
+            if (!pendingIds.includes(inv.id)) {
+                pendingIds.push(inv.id);
+            }
+            inv.due = mod.modifiedAmount;
+        }
+    });
+    
+    localStorage.setItem(STORAGE.INVOICES, JSON.stringify(invoices));
+    localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds));
+    
+    exportToExcel(false);
+    backToMain();
+    calculateStats();
+    renderCurrentTab();
+}
+
+function resetProcessing() {
+    tempInvoiceModifications = {};
+    renderProcessingTable();
+}
+
+// --- تحديث زر مسح التصفية ---
+function updateClearFilterButtonVisibility() {
+    const btn = document.getElementById('clearFilterBtn');
+    if (invoiceNumberFilter.length > 0) {
+        btn.style.display = 'inline-flex';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+setTimeout(() => updateClearFilterButtonVisibility(), 100);
 
 // تشغيل النظام
 init();

@@ -77,6 +77,34 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
 .modal-footer {padding: 15px 25px; background: #f8f9fa; border-radius: 0 0 15px 15px; display: flex; gap: 10px; justify-content: flex-end;}
 @keyframes fadeIn {from {opacity: 0;} to {opacity: 1;}}
 @keyframes slideDown {from {transform: translateY(-50px); opacity: 0;} to {transform: translateY(0); opacity: 1;}}
+
+/* صفحة المعالجة */
+#processingPage { display:none; }
+.proc-box { background:#fff; padding:25px; border-radius:15px; max-width:1400px; margin:auto; box-shadow:0 4px 20px rgba(0,0,0,0.05); }
+.proc-header { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eee; padding-bottom:15px; margin-bottom:20px; }
+.proc-header h2 { margin:0; color:var(--d); display:flex; align-items:center; gap:10px; }
+.proc-table-wrap { overflow-x:auto; border-radius:10px; border:1px solid #ddd; }
+.proc-table { width:100%; border-collapse:collapse; min-width:900px; }
+.proc-table th { background:#2c3e50; color:#fff; padding:14px 12px; text-align:right; font-size:0.95em; position:sticky; top:0; }
+.proc-table td { padding:11px 12px; border-bottom:1px solid #eee; vertical-align:middle; }
+.proc-table tr:hover { background:#f8f9ff; }
+.proc-table tr.edited { background:#fffbe6 !important; }
+.proc-table tr.edited:hover { background:#fff5cc !important; }
+.proc-amount-input { width:120px; padding:7px 10px; border:2px solid #ddd; border-radius:6px; font-family:'Cairo'; font-size:1em; font-weight:bold; text-align:center; transition:0.2s; }
+.proc-amount-input:focus { border-color:var(--p); outline:none; box-shadow:0 0 0 3px rgba(41,128,185,0.15); }
+.proc-amount-input.changed { border-color:#f39c12; background:#fffbe6; }
+.proc-diff-cell { font-weight:bold; color:#8e44ad; font-size:0.95em; }
+.proc-diff-cell.zero { color:#aaa; }
+.proc-summary { background:#f8f9fa; border-radius:10px; padding:20px; margin-top:20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; }
+.proc-sum-card { background:#fff; padding:15px; border-radius:8px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.proc-sum-card .label { font-size:0.85em; color:#7f8c8d; margin-bottom:5px; }
+.proc-sum-card .val { font-size:1.6em; font-weight:bold; }
+.proc-actions { display:flex; gap:12px; margin-top:20px; }
+.proc-actions button { flex:1; padding:14px; font-size:1.05em; justify-content:center; }
+button.proc-export { background:#27ae60; }
+button.proc-back { background:#95a5a6; }
+button.proc-reset { background:#e67e22; }
+.filter-active-badge { display:inline-block; background:#e74c3c; color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.75em; text-align:center; line-height:18px; margin-right:3px; }
 </style>
 </head>
 <body>
@@ -90,8 +118,8 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
         <div style="margin-right: auto; display:flex; gap:10px;">
             <select id="creatorFilter" onchange="handleFilterChange()"><option value="all">كل المناديب</option></select>
             <input id="searchInput" placeholder="بحث بالمرجع أو العميل..." onkeyup="renderCurrentTab()">
-            <button onclick="openInvoiceFilter()" style="background:var(--o)"><i class="fas fa-filter"></i> فلترة متقدمة</button>
-            <button onclick="clearInvoiceFilter()" id="clearFilterBtn" style="background:#95a5a6; display:none;"><i class="fas fa-times"></i> مسح التصفية</button>
+            <button onclick="openInvoiceFilter()" style="background:var(--o)" id="filterBtn"><i class="fas fa-filter"></i> فلترة متقدمة</button>
+                <button onclick="clearInvoiceFilter()" id="clearFilterBtn" style="background:#c0392b; display:none"><i class="fas fa-times-circle"></i> مسح التصفية</button>
         </div>
     </div>
 
@@ -105,8 +133,8 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
     </div>
 
     <div style="display: flex; gap: 10px;">
-        <button onclick="goToProcessing()" class="export-all" style="background:#e74c3c"><i class="fas fa-arrow-left"></i> معالجة وتعديل الأسعار</button>
         <button onclick="exportToExcel(false)" class="export-all"><i class="fas fa-file-excel"></i> تصدير Excel (ديناميكي بالمعادلات)</button>
+        <button onclick="openProcessingPage()" style="background:#16a085; flex:0 0 auto; padding:12px 20px; font-size:1em; display:inline-flex; align-items:center; gap:8px; border-radius:8px; margin-top:5px"><i class="fas fa-table"></i> معالجة ← التالي</button>
         <button onclick="saveToHistory()" class="save-archive"><i class="fas fa-save"></i> حفظ المديونية للأرشيف</button>
     </div>
     <br>
@@ -156,45 +184,80 @@ td{padding:12px 15px;border-bottom: 1px solid #eee; vertical-align: middle;}
         <div id="nicksDiv" style="display:none; padding:20px;"><h3>تخصيص أسماء المناديب</h3><div id="nickRows"></div></div>
         
         <div id="historyDiv" style="display:none; padding:20px;"><h3 style="color:var(--p)">سجل المديونيات المحفوظة</h3><div id="historyList"></div></div>
-        
-        <div id="processingDiv" style="display:none; padding:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h3 style="margin:0; color:var(--d)"><i class="fas fa-edit"></i> معالجة وتعديل الأسعار</h3>
-                <button onclick="backToMain()" style="background:#95a5a6"><i class="fas fa-arrow-right"></i> العودة</button>
-            </div>
-            <div style="background:#f0f0f0; padding:15px; border-radius:8px; margin-bottom:20px; color:#555;">
-                <i class="fas fa-info-circle"></i> <strong>التعليمات:</strong> يمكنك تعديل المبالغ في الجدول أدناه. الفروقات ستنتقل تلقائياً إلى "بانتظار التحويل". التعديلات مؤقتة وتُمسح عند تحديث البيانات.
-            </div>
-            <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
-                <table id="processingTable" style="width:100%;">
-                    <thead>
-                        <tr style="background:#f8f9fa;">
-                            <th style="padding:15px; text-align:right; font-weight:700;">المرجع</th>
-                            <th style="padding:15px; text-align:right; font-weight:700;">العميل</th>
-                            <th style="padding:15px; text-align:right; font-weight:700;">المندوب</th>
-                            <th style="padding:15px; text-align:right; font-weight:700;">المبلغ الأصلي</th>
-                            <th style="padding:15px; text-align:right; font-weight:700;">المبلغ المعدل</th>
-                            <th style="padding:15px; text-align:right; font-weight:700;">الفرق</th>
-                        </tr>
-                    </thead>
-                    <tbody id="processingRows"></tbody>
-                </table>
-            </div>
-            <div style="margin-top:20px; padding:15px; background:#e8f8f5; border-radius:8px; border-left:4px solid var(--adj);">
-                <strong style="color:var(--adj);">ملخص التعديلات:</strong>
-                <div style="margin-top:10px;">
-                    <div>إجمالي الفروقات المنقولة: <span id="totalDiffAmount" style="font-weight:bold; color:#c0392b;">0</span></div>
-                </div>
-            </div>
-            <div style="margin-top:20px; display:flex; gap:10px;">
-                <button onclick="confirmProcessing()" class="export-all" style="background:var(--g); flex:1;"><i class="fas fa-check"></i> تأكيد وتصدير</button>
-                <button onclick="resetProcessing()" style="background:#95a5a6; flex:1; width:auto; justify-content:center;"><i class="fas fa-redo"></i> إعادة تعيين</button>
-            </div>
-        </div>
     </div>
 </div>
 
 <div class="floating-bar" id="floatBar"><div>تم تحديد: <span id="selCount">0</span></div><div id="actionButtons" style="margin-right:20px"></div></div>
+
+<!-- صفحة المعالجة -->
+<div id="processingPage">
+<div class="proc-box">
+    <div class="proc-header">
+        <h2><i class="fas fa-table" style="color:#16a085"></i> صفحة المعالجة والتصدير</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span id="procCreatorLabel" style="font-weight:bold; color:var(--p); font-size:1.1em"></span>
+            <span id="procDateLabel" style="color:#7f8c8d; font-size:0.9em"></span>
+        </div>
+    </div>
+
+    <div style="background:#fff3cd; border-radius:8px; padding:12px 18px; margin-bottom:18px; color:#856404; font-size:0.92em; display:flex; align-items:center; gap:10px;">
+        <i class="fas fa-info-circle" style="font-size:1.2em"></i>
+        <span>يمكنك تعديل <strong>المبلغ للتصدير</strong> لكل فاتورة — الفرق سينتقل تلقائياً لقسم <strong>بانتظار التحويل</strong> في الإكسل. التعديلات مؤقتة وتُمسح عند تحديث البيانات.</span>
+    </div>
+
+    <div class="proc-table-wrap">
+        <table class="proc-table" id="procTable">
+            <thead>
+                <tr>
+                    <th style="width:40px; text-align:center">#</th>
+                    <th>المرجع</th>
+                    <th>العميل</th>
+                    <th>تاريخ الفاتورة</th>
+                    <th>ت. الاستحقاق</th>
+                    <th style="color:#c0392b">المبلغ الأصلي</th>
+                    <th style="color:#16a085">المبلغ للتصدير</th>
+                    <th style="color:#8e44ad">الفرق ← انتظار</th>
+                    <th style="width:60px; text-align:center">إعادة</th>
+                </tr>
+            </thead>
+            <tbody id="procRows"></tbody>
+        </table>
+    </div>
+
+    <div class="proc-summary" id="procSummary">
+        <div class="proc-sum-card">
+            <div class="label"><i class="fas fa-file-invoice-dollar"></i> إجمالي المديونية للتصدير</div>
+            <div class="val" id="procSumDebt" style="color:#c0392b">0</div>
+        </div>
+        <div class="proc-sum-card">
+            <div class="label"><i class="fas fa-exchange-alt"></i> بانتظار التحويل (الفروق)</div>
+            <div class="val" id="procSumPendingDiff" style="color:#8e44ad">0</div>
+        </div>
+        <div class="proc-sum-card">
+            <div class="label"><i class="fas fa-exchange-alt"></i> بانتظار التحويل (أصلي)</div>
+            <div class="val" id="procSumPendingOrig" style="color:#8e44ad">0</div>
+        </div>
+        <div class="proc-sum-card">
+            <div class="label"><i class="fas fa-sliders-h"></i> صافي التسويات</div>
+            <div class="val" id="procSumAdj" style="color:#16a085">0</div>
+        </div>
+        <div class="proc-sum-card">
+            <div class="label"><i class="fas fa-gas-pump"></i> المصروفات</div>
+            <div class="val" id="procSumExp" style="color:#e74c3c">0</div>
+        </div>
+        <div class="proc-sum-card" style="border:2px solid var(--d)">
+            <div class="label"><i class="fas fa-calculator"></i> الصافي النهائي</div>
+            <div class="val" id="procSumNet" style="color:var(--d)">0</div>
+        </div>
+    </div>
+
+    <div class="proc-actions">
+        <button onclick="closeProcessingPage()" class="proc-back"><i class="fas fa-arrow-right"></i> رجوع</button>
+        <button onclick="resetProcOverrides()" class="proc-reset"><i class="fas fa-undo"></i> مسح التعديلات</button>
+        <button onclick="exportFromProcessing()" class="proc-export"><i class="fas fa-file-excel"></i> تصدير Excel المعالج</button>
+    </div>
+</div>
+</div>
 
 <!-- مودال الفلترة -->
 <div id="filterModal" class="modal">
@@ -246,6 +309,7 @@ const STORAGE = {
 let invoices=[], debtIds=[], pendingIds=[], expenses=[], adjustments=[], nicknames={}, historyLog=[], customers={}, selectedIds=new Set(), currentTab='delayed';
 let currentStats = { debt: 0, expenses: 0, net: 0, delayed: 0, pending: 0, adjNet: 0 };
 let invoiceNumberFilter = []; // فلتر أرقام الفواتير
+let priceOverrides = {}; // تعديلات الأسعار في صفحة المعالجة (مؤقتة)
 
 // --- التشغيل الأولي ---
 function init(){
@@ -290,6 +354,7 @@ async function fetchData(){
             };
         });
         localStorage.setItem(STORAGE.INVOICES,JSON.stringify(invoices));
+        priceOverrides = {}; // مسح التعديلات المؤقتة عند تحديث البيانات
         updateCreatorsList(); calculateStats(); renderCurrentTab();
         btn.innerHTML='<i class="fas fa-sync-alt"></i> تحديث'; st.innerText="✅ تم"; setTimeout(()=>st.innerText="",2000);
     }catch(e){
@@ -538,20 +603,11 @@ function exportHistoryItem(item){ generateColoredExcel(item.creatorName, item.in
 
 function exportToExcel(isHistory = false) {
     if(isHistory) return; const creator = document.getElementById("creatorFilter").value; const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator); const dateStr = new Date().toISOString().split('T')[0];
-    
-    // تطبيق التعديلات المؤقتة على نسخة مؤقتة من الفواتير
-    const invoicesForExport = invoices.map(inv => {
-        if (tempInvoiceModifications[inv.id]) {
-            return { ...inv, due: tempInvoiceModifications[inv.id].modifiedAmount };
-        }
-        return inv;
-    });
-    
-    const debtInvoices = invoicesForExport.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
+    const debtInvoices = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
     const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
     const filteredAdjustments = adjustments.filter(a => creator === 'all' || a.creator === creator);
-    const delayedInvoices = invoicesForExport.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
-    const pendingInvoicesExport = invoicesForExport.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0 && inv.status !== 'Paid');
+    const pendingInvoicesExport = invoices.filter(inv => pendingIds.includes(inv.id) && (creator === 'all' || inv.creator === creator) && inv.due > 0);
     generateColoredExcel(creatorName, debtInvoices, filteredExpenses, filteredAdjustments, delayedInvoices, pendingInvoicesExport, currentStats, dateStr);
 }
 
@@ -750,6 +806,9 @@ function applyInvoiceFilter() {
     closeInvoiceFilter();
     renderCurrentTab();
     
+    // إظهار/إخفاء زر مسح التصفية
+    document.getElementById('clearFilterBtn').style.display = invoiceNumberFilter.length > 0 ? 'inline-flex' : 'none';
+
     // إظهار رسالة تأكيد
     const status = document.getElementById('status');
     if (invoiceNumberFilter.length > 0) {
@@ -770,147 +829,221 @@ window.onclick = function(event) {
     }
 }
 
-// --- دوال مسح التصفية ---
+// --- دالة مسح التصفية ---
 function clearInvoiceFilter() {
     invoiceNumberFilter = [];
     document.getElementById('clearFilterBtn').style.display = 'none';
     renderCurrentTab();
     const status = document.getElementById('status');
-    status.innerText = '✅ تم مسح التصفية';
+    status.innerText = '✅ تم إلغاء الفلترة';
     status.style.color = 'var(--p)';
-    setTimeout(() => status.innerText = '', 3000);
+    setTimeout(() => status.innerText = '', 2500);
 }
 
-// --- متغيرات مؤقتة للمعالجة ---
-let tempInvoiceModifications = {};
-let processingInvoices = [];
-
-// --- دوال مرحلة المعالجة ---
-function goToProcessing() {
-    const creator = document.getElementById('creatorFilter').value;
-    if (creator === 'all') {
-        alert('يجب اختيار مندوب أولاً!');
-        return;
-    }
-    
-    processingInvoices = getFilteredInvoices().filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id));
-    
-    if (processingInvoices.length === 0) {
-        alert('لا توجد فواتير للمعالجة');
-        return;
-    }
-    
-    tempInvoiceModifications = {};
-    currentTab = 'processing';
-    document.getElementById('mainContainer').style.display = 'none';
-    document.getElementById('processingDiv').style.display = 'block';
+// --- صفحة المعالجة ---
+function openProcessingPage() {
+    document.querySelector('.box').style.display = 'none';
+    document.getElementById('processingPage').style.display = 'block';
     renderProcessingTable();
 }
 
-function backToMain() {
-    tempInvoiceModifications = {};
-    document.getElementById('processingDiv').style.display = 'none';
-    document.getElementById('mainContainer').style.display = 'block';
-    currentTab = 'delayed';
-    renderCurrentTab();
+function closeProcessingPage() {
+    document.getElementById('processingPage').style.display = 'none';
+    document.querySelector('.box').style.display = 'block';
+}
+
+function resetProcOverrides() {
+    if (!confirm('مسح جميع تعديلات الأسعار؟')) return;
+    priceOverrides = {};
+    renderProcessingTable();
 }
 
 function renderProcessingTable() {
-    const tbody = document.getElementById('processingRows');
+    const creator = document.getElementById('creatorFilter').value;
+    const creatorName = creator === 'all' ? 'كل المناديب' : (nicknames[creator] || creator);
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    document.getElementById('procCreatorLabel').innerText = '👤 ' + creatorName;
+    document.getElementById('procDateLabel').innerText = '📅 ' + dateStr;
+
+    const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
+    const isInvCreator = (inv) => (creator === 'all' || inv.creator === creator);
+
+    // فواتير المديونية فقط (لا pending)
+    const debtInvs = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+
+    const tbody = document.getElementById('procRows');
     tbody.innerHTML = '';
-    let totalDiff = 0;
-    
-    processingInvoices.forEach(inv => {
-        const mod = tempInvoiceModifications[inv.id] || {};
-        const modifiedAmount = mod.modifiedAmount !== undefined ? mod.modifiedAmount : inv.due;
-        const difference = inv.due - modifiedAmount;
-        totalDiff += Math.abs(difference);
-        
-        const nick = nicknames[inv.creator] || inv.creator;
-        const row = document.createElement('tr');
-        row.style.borderBottom = '1px solid #eee';
-        
-        row.innerHTML = `
-            <td style="padding:12px 15px;">${inv.ref}</td>
-            <td style="padding:12px 15px;">${inv.customer}</td>
-            <td style="padding:12px 15px;">${nick}</td>
-            <td style="padding:12px 15px; font-weight:bold;">${inv.due.toLocaleString()}</td>
-            <td style="padding:12px 15px;">
-                <input type="number" value="${modifiedAmount}" 
-                    onchange="updateProcessingAmount(${inv.id}, this.value)" 
-                    style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-family:'Cairo';"
-                    step="0.01">
-            </td>
-            <td style="padding:12px 15px; font-weight:bold; color:${difference > 0 ? '#c0392b' : '#27ae60'};">${difference.toLocaleString()}</td>
-        `;
-        
-        tbody.appendChild(row);
-    });
-    
-    document.getElementById('totalDiffAmount').innerText = totalDiff.toLocaleString();
-}
 
-function updateProcessingAmount(invoiceId, newAmount) {
-    const newVal = parseFloat(newAmount) || 0;
-    const inv = processingInvoices.find(i => i.id === invoiceId);
-    
-    if (!inv) return;
-    
-    if (newVal < 0) {
-        alert('المبلغ يجب أن يكون موجباً');
-        return;
-    }
-    
-    if (newVal > inv.due) {
-        alert('المبلغ المعدل لا يمكن أن يكون أكبر من المبلغ الأصلي');
-        return;
-    }
-    
-    tempInvoiceModifications[invoiceId] = {
-        modifiedAmount: newVal,
-        difference: inv.due - newVal
-    };
-    
-    renderProcessingTable();
-}
-
-function confirmProcessing() {
-    Object.keys(tempInvoiceModifications).forEach(invId => {
-        const mod = tempInvoiceModifications[invId];
-        const inv = invoices.find(i => i.id == invId);
-        if (inv && mod.difference > 0) {
-            if (!pendingIds.includes(inv.id)) {
-                pendingIds.push(inv.id);
-            }
-            inv.due = mod.modifiedAmount;
-        }
-    });
-    
-    localStorage.setItem(STORAGE.INVOICES, JSON.stringify(invoices));
-    localStorage.setItem(STORAGE.PENDING_IDS, JSON.stringify(pendingIds));
-    
-    exportToExcel(false);
-    backToMain();
-    calculateStats();
-    renderCurrentTab();
-}
-
-function resetProcessing() {
-    tempInvoiceModifications = {};
-    renderProcessingTable();
-}
-
-// --- تحديث زر مسح التصفية ---
-function updateClearFilterButtonVisibility() {
-    const btn = document.getElementById('clearFilterBtn');
-    if (invoiceNumberFilter.length > 0) {
-        btn.style.display = 'inline-flex';
+    if (debtInvs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:40px; color:#999">لا توجد فواتير مديونية للعرض<br><small>قم بنقل الفواتير للمديونية أولاً من الصفحة الرئيسية</small></td></tr>`;
     } else {
-        btn.style.display = 'none';
+        debtInvs.forEach((inv, idx) => {
+            const overrideVal = priceOverrides[inv.id];
+            const exportAmount = overrideVal !== undefined ? overrideVal : inv.due;
+            const diff = inv.due - exportAmount;
+            const isEdited = overrideVal !== undefined && overrideVal !== inv.due;
+
+            tbody.innerHTML += `
+            <tr id="proc-row-${inv.id}" class="${isEdited ? 'edited' : ''}">
+                <td style="text-align:center; color:#aaa; font-size:0.85em">${idx + 1}</td>
+                <td style="color:var(--p); font-weight:bold">${inv.ref}</td>
+                <td>${inv.customer}</td>
+                <td>${inv.date}</td>
+                <td style="color:#c0392b">${inv.dueDate || '-'}</td>
+                <td style="font-weight:bold; color:#c0392b">${inv.due.toLocaleString()}</td>
+                <td>
+                    <input type="number" 
+                        class="proc-amount-input ${isEdited ? 'changed' : ''}"
+                        id="inp-${inv.id}"
+                        value="${exportAmount}"
+                        min="0"
+                        max="${inv.due}"
+                        step="0.01"
+                        oninput="updateProcAmount(${inv.id}, ${inv.due}, this.value)"
+                        onfocus="this.select()"
+                    >
+                </td>
+                <td class="proc-diff-cell ${diff === 0 ? 'zero' : ''}" id="diff-${inv.id}">
+                    ${diff > 0 ? diff.toLocaleString() : '—'}
+                </td>
+                <td style="text-align:center">
+                    ${isEdited ? `<button onclick="resetProcRow(${inv.id}, ${inv.due})" style="background:#fff; color:#e67e22; border:1px solid #e67e22; padding:4px 8px; font-size:0.8em; border-radius:5px" title="إعادة للقيمة الأصلية"><i class="fas fa-undo"></i></button>` : `<span style="color:#ddd">—</span>`}
+                </td>
+            </tr>`;
+        });
     }
+    updateProcSummary(debtInvs, creator);
 }
 
-setTimeout(() => updateClearFilterButtonVisibility(), 100);
+function updateProcAmount(invId, originalDue, newVal) {
+    let val = parseFloat(newVal);
+    if (isNaN(val) || val < 0) val = 0;
+    if (val > originalDue) val = originalDue;
+
+    priceOverrides[invId] = val;
+
+    const diff = originalDue - val;
+    const isEdited = val !== originalDue;
+
+    // تحديث الخلية الفارق
+    const diffCell = document.getElementById(`diff-${invId}`);
+    if (diffCell) {
+        diffCell.className = `proc-diff-cell ${diff === 0 ? 'zero' : ''}`;
+        diffCell.innerText = diff > 0 ? diff.toLocaleString() : '—';
+    }
+
+    // تلوين الصف
+    const row = document.getElementById(`proc-row-${invId}`);
+    if (row) row.className = isEdited ? 'edited' : '';
+
+    // تلوين الحقل
+    const inp = document.getElementById(`inp-${invId}`);
+    if (inp) {
+        inp.className = `proc-amount-input ${isEdited ? 'changed' : ''}`;
+        inp.value = val;
+    }
+
+    // تحديث زر الإعادة بدون إعادة رسم الجدول كله
+    const td = row?.lastElementChild;
+    if (td) {
+        td.innerHTML = isEdited
+            ? `<button onclick="resetProcRow(${invId}, ${originalDue})" style="background:#fff; color:#e67e22; border:1px solid #e67e22; padding:4px 8px; font-size:0.8em; border-radius:5px" title="إعادة للقيمة الأصلية"><i class="fas fa-undo"></i></button>`
+            : `<span style="color:#ddd">—</span>`;
+    }
+
+    // تحديث الملخص
+    const creator = document.getElementById('creatorFilter').value;
+    const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
+    const isInvCreator = (inv) => (creator === 'all' || inv.creator === creator);
+    const debtInvs = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+    updateProcSummary(debtInvs, creator);
+}
+
+function resetProcRow(invId, originalDue) {
+    delete priceOverrides[invId];
+    const inp = document.getElementById(`inp-${invId}`);
+    if (inp) inp.value = originalDue;
+    updateProcAmount(invId, originalDue, originalDue);
+}
+
+function updateProcSummary(debtInvs, creator) {
+    // حساب الإجماليات بالأسعار المعدّلة
+    let totalDebtExport = 0;
+    let totalDiffPending = 0;
+    debtInvs.forEach(inv => {
+        const exportAmt = priceOverrides[inv.id] !== undefined ? priceOverrides[inv.id] : inv.due;
+        totalDebtExport += exportAmt;
+        totalDiffPending += (inv.due - exportAmt);
+    });
+
+    // الانتظار الأصلي
+    const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
+    const isInvCreator = (inv) => (creator === 'all' || inv.creator === creator);
+    const origPendingInvs = invoices.filter(inv => pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+    const totalOrigPending = origPendingInvs.reduce((a, b) => a + b.due, 0);
+
+    // التسويات والمصروفات
+    const filteredAdj = adjustments.filter(a => creator === 'all' || a.creator === creator);
+    let adjPlus = 0, adjMinus = 0;
+    filteredAdj.forEach(a => { if (a.type === 'plus') adjPlus += a.amount; else adjMinus += a.amount; });
+    const adjNet = adjPlus - adjMinus;
+    const filteredExp = expenses.filter(e => creator === 'all' || e.creator === creator);
+    const totalExp = filteredExp.reduce((a, b) => a + b.amount, 0);
+    const net = totalDebtExport + adjNet - totalExp;
+
+    document.getElementById('procSumDebt').innerText = totalDebtExport.toLocaleString();
+    document.getElementById('procSumPendingDiff').innerText = totalDiffPending > 0 ? totalDiffPending.toLocaleString() : '—';
+    document.getElementById('procSumPendingOrig').innerText = totalOrigPending.toLocaleString();
+    document.getElementById('procSumAdj').innerText = (adjNet >= 0 ? '+' : '') + adjNet.toLocaleString();
+    document.getElementById('procSumExp').innerText = totalExp.toLocaleString();
+    document.getElementById('procSumNet').innerText = net.toLocaleString();
+}
+
+function exportFromProcessing() {
+    const creator = document.getElementById('creatorFilter').value;
+    const creatorName = creator === 'all' ? 'الكل' : (nicknames[creator] || creator);
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    const isActive = (inv) => (inv.status !== 'Paid' && inv.status !== 'Voided' && inv.status !== 'Draft' && inv.due > 0);
+    const isInvCreator = (inv) => (creator === 'all' || inv.creator === creator);
+
+    // فواتير المديونية مع تطبيق التعديلات
+    const rawDebtInvs = invoices.filter(inv => debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+    const exportDebtInvs = rawDebtInvs.map(inv => {
+        const override = priceOverrides[inv.id];
+        return override !== undefined ? { ...inv, due: override } : inv;
+    }).filter(inv => inv.due > 0);
+
+    // فواتير الانتظار الأصلية
+    const origPendingInvs = invoices.filter(inv => pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+
+    // إضافة الفروق كفواتير انتظار وهمية
+    const diffEntries = rawDebtInvs
+        .filter(inv => priceOverrides[inv.id] !== undefined && (inv.due - priceOverrides[inv.id]) > 0)
+        .map(inv => ({
+            ...inv,
+            due: inv.due - priceOverrides[inv.id],
+            ref: inv.ref + ' [باقي]',
+        }));
+
+    const allPendingForExport = [...origPendingInvs, ...diffEntries];
+
+    const filteredExpenses = expenses.filter(e => creator === 'all' || e.creator === creator);
+    const filteredAdjustments = adjustments.filter(a => creator === 'all' || a.creator === creator);
+    const delayedInvoices = invoices.filter(inv => inv.is_delayed && !debtIds.includes(inv.id) && !pendingIds.includes(inv.id) && isInvCreator(inv) && isActive(inv));
+
+    const totalDebtExport = exportDebtInvs.reduce((a, b) => a + b.due, 0);
+    let adjPlus = 0, adjMinus = 0;
+    filteredAdjustments.forEach(a => { if (a.type === 'plus') adjPlus += a.amount; else adjMinus += a.amount; });
+    const adjNet = adjPlus - adjMinus;
+    const totalExp = filteredExpenses.reduce((a, b) => a + b.amount, 0);
+    const net = totalDebtExport + adjNet - totalExp;
+    const totalPending = allPendingForExport.reduce((a, b) => a + b.due, 0);
+
+    const stats = { debt: totalDebtExport, expenses: totalExp, net, pending: totalPending, adjNet, adjPlus, adjMinus };
+    generateColoredExcel(creatorName, exportDebtInvs, filteredExpenses, filteredAdjustments, delayedInvoices, allPendingForExport, stats, dateStr);
+}
 
 // تشغيل النظام
 init();
